@@ -1,5 +1,7 @@
 # Drawing Studio (`v1.0.42`)
 
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](./LICENSE)
+
 **把 Google Colab 按需 GPU、Google Drive 持久化存储与完整 ComfyUI 节点引擎，装进一台轻量 VPS 的个人 AI 影像创作工作台。**
 
 传统的 AI 生图工具往往走入两个极端：要么是开箱即用但能力锁死的云端 SaaS，模型和作品受制于人；要么是直接把原版 ComfyUI 暴露到公网，连线复杂、手机端几乎不可用，且机器关机就失联、大模型和出图堆在昂贵的 GPU 云盘里反复迁移。
@@ -286,3 +288,13 @@ python3 -m unittest discover -s backend -p "test_*.py"
 - **[LINUX DO](https://linux.do/)** — 真诚、友善、团结、专业的新理想型技术社区
 - **[ComfyUI](https://github.com/comfyanonymous/ComfyUI)** — 模块化扩散模型节点推理引擎
 - **[OpenMOSS](https://github.com/OpenMOSS)** — MOSS Image 开源图像生成生态
+
+---
+
+## 开源协议
+
+本项目基于 **[GNU Affero General Public License v3.0 (AGPL-3.0)](./LICENSE)** 开源发布。
+
+- 你可以自由使用、研究、修改并分发本项目的源码，但任何基于本项目的衍生作品或修改版本在分发时须继续采用 **AGPL-3.0** 协议开源。
+- 若你修改本项目并将其作为网络服务（Web / SaaS / API）部署供他人通过网络交互使用，也须向用户提供修改后的完整对应源代码。
+- 完整协议条款请参阅仓库根目录的 [LICENSE](./LICENSE) 文件。
