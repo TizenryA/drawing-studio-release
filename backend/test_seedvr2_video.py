@@ -305,14 +305,14 @@ class TasksAndGalleryVideoTests(unittest.IsolatedAsyncioTestCase):
             Gallery.concat_videos([copy15, copy15], out_concat, trim_overlap_frames=2, crf=15)
             self.assertTrue(out_concat.is_file() and out_concat.stat().st_size > 0)
 
-    async def test_health_endpoint_reports_1_0_42(self):
+    async def test_health_endpoint_reports_1_0_43(self):
         import httpx
         with tempfile.TemporaryDirectory() as tmp, patch.dict(os.environ, {"DRAWING_DATA": tmp}):
             from . import main
             async with httpx.AsyncClient(transport=httpx.ASGITransport(app=main.app), base_url="http://test") as client:
                 r = await client.get("/api/health")
                 self.assertEqual(r.status_code, 200)
-                self.assertEqual(r.json(), {"ok": True, "version": "1.0.42"})
+                self.assertEqual(r.json(), {"ok": True, "version": "1.0.43"})
 
 
 if __name__ == "__main__":

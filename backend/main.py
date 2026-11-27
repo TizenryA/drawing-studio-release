@@ -101,7 +101,7 @@ async def lifespan(app):
         task.cancel()
 
 
-app = FastAPI(title='Drawing Studio', version='1.0.42', lifespan=lifespan)
+app = FastAPI(title='Drawing Studio', version='1.0.43', lifespan=lifespan)
 
 
 @app.middleware('http')
@@ -139,7 +139,7 @@ async def runtime_error(request, exc):
 
 @app.get('/api/health')
 async def health():
-    return {'ok': True, 'version': '1.0.42'}
+    return {'ok': True, 'version': '1.0.43'}
 
 
 @app.get('/api/auth/status')

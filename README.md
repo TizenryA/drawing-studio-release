@@ -1,4 +1,4 @@
-# Drawing Studio (`v1.0.42`)
+# Drawing Studio (`v1.0.43`)
 
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](./LICENSE)
 [![Live Preview](https://img.shields.io/badge/Demo-%E5%9C%A8%E7%BA%BF%E5%89%8D%E7%AB%AF%E9%A2%84%E8%A7%88-0ea5e9.svg)](https://tizenrya.github.io/drawing-studio-release/)

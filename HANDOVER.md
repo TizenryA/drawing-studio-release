@@ -1,12 +1,17 @@
-# Drawing Studio (`v1.0.42`) 源码与架构交接文档
+# Drawing Studio (`v1.0.43`) 源码与架构交接文档
 
-本文档面向接手维护、二次开发或独立部署 **Drawing Studio** 的工程师，基于 `v1.0.42` 干净公开版源码编写，所有路由、字段、模块职责、工作流清单与约束条件均与当前源码逐一对应。
+本文档面向接手维护、二次开发或独立部署 **Drawing Studio** 的工程师，基于 `v1.0.43` 干净公开版源码编写，所有路由、字段、模块职责、工作流清单与约束条件均与当前源码逐一对应。
 
 ---
 
 ## 1. 版本基线与演进历史
 
-- **源码基线版本**：`1.0.42`（`backend/main.py` 中的 `FastAPI(..., version='1.0.42')`、`GET /api/health` 返回 `{"ok": true, "version": "1.0.42"}`、`web/package.json` 版本号 `1.0.42`）。
+- **源码基线版本**：`1.0.43`（`backend/main.py` 中的 `FastAPI(..., version='1.0.43')`、`GET /api/health` 返回 `{"ok": true, "version": "1.0.43"}`、`web/package.json` 版本号 `1.0.43`）。
+- **`1.0.42` → `1.0.43` 核心变更**：
+  - 采用 **GNU AGPL-3.0** 开源协议，并在 [Dockerfile](./Dockerfile) 与 [Dockerfile.release](./Dockerfile.release) 镜像构建阶段嵌入 [LICENSE](./LICENSE)。
+  - 新增完整的 **Google Colab & Google Drive 独立 OAuth2 授权后端（[backend/oauth_flow.py](./backend/oauth_flow.py)）与前端向导面板（[web/src/components/OAuthPanel.jsx](./web/src/components/OAuthPanel.jsx)）**，支持 PKCE 手动复制授权码、同源 HTTPS 弹窗回调、凭据 JSON 验证导入、实时连通性测试与一键解绑。
+  - 新增零依赖交互式前端预览模式（GitHub Pages Demo，构建生产镜像时经 `__DEMO_MODE__` 编译期裁剪彻底移除）。
+  - 新增原生多架构发行支持：`linux/amd64`、`linux/arm64`（ARM64 服务器与 Apple Silicon Mac Docker），以及 macOS 原生一键启动脚本 [ops/start-macos.command](./ops/start-macos.command)。
 - **`1.0.41` → `1.0.42` 核心变更**：
   - 增强 Colab 运行时断连与算力释放判定（`backend/runtime.py` 增加 `_mark_disconnected()`、冻结 `disconnected_at` 时刻的 `uptime` 计算、清空过期 `memory_used`/`memory_total` 并避免轮询时产生重复断连日志）。
   - 抽出独立前端状态机辅助模块 `web/src/machineState.js` 与测试 `web/src/machineState.test.js`，在 `web/src/pages/Machine.jsx` 中清晰区分「运行时已断开 / 停止计费」与「运行中 / 启动中 / 待重置」状态。
@@ -216,7 +221,7 @@ STUDIO_DIR=/opt/drawing-studio bash ops/backup.sh
    - 先运行 `ops/backup.sh` 完成在线备份。
    - 执行 `docker compose build && docker compose up -d`。
 3. **上线后验收**：
-   - 验证 `GET /api/health` 返回 `{"ok": true, "version": "1.0.42"}`。
+   - 验证 `GET /api/health` 返回 `{"ok": true, "version": "1.0.43"}`。
    - 验证登录态、`/api/runtime` 状态接管、`GET /api/gallery?page=1&limit=12` 列表及视频播放（206 Range）。
 4. **回滚方法**：
    - 若需回滚，先在无活跃任务时停止容器，切回旧镜像版本并恢复升级前备份的 `data/` 与 `compose.yaml`，再启动容器。

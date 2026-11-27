@@ -13,6 +13,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY backend/ ./backend/
 COPY colab/ ./colab/
 COPY workflows/ ./workflows/
+COPY LICENSE ./
 COPY --from=web /build/dist ./web/dist
 ENV DRAWING_DATA=/data PYTHONUNBUFFERED=1
 EXPOSE 8790
