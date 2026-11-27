@@ -246,9 +246,9 @@ class Krea2MossPublicWorkflowTests(unittest.TestCase):
 
     def test_imported_moss_workflow_splices_multiple_extra_loras(self):
         catalog = [
-            {"id": "horse-id", "name": "wooden_horse_Moss.safetensors", "filename": "wooden_horse_Moss.safetensors", "kind": "loras"},
-            {"id": "shibari-id", "name": "shibaribondageV1.1-moss.safetensors", "filename": "shibaribondageV1.1-moss.safetensors", "kind": "loras"},
-            {"id": "disabled-id", "name": "straight-arm-moss.safetensors", "filename": "straight-arm-moss.safetensors", "kind": "loras"},
+            {"id": "style-a-id", "name": "demo_style_a.safetensors", "filename": "demo_style_a.safetensors", "kind": "loras"},
+            {"id": "style-b-id", "name": "demo_style_b.safetensors", "filename": "demo_style_b.safetensors", "kind": "loras"},
+            {"id": "disabled-id", "name": "demo_style_disabled.safetensors", "filename": "demo_style_disabled.safetensors", "kind": "loras"},
         ]
         for wf_file, wid in ((MOSS_SFT_FILE, "moss-sft"), (MOSS_BASE_FILE, "moss-base")):
             with self.subTest(wid=wid), tempfile.TemporaryDirectory() as tmp:
@@ -257,10 +257,10 @@ class Krea2MossPublicWorkflowTests(unittest.TestCase):
                 built = store.build(
                     {
                         "workflow_id": wid,
-                        "prompt": "a wooden submission horse, test",
+                        "prompt": "a sunlit courtyard, test",
                         "loras": [
-                            {"id": "horse-id", "strength": 0.8},
-                            {"id": "shibari-id", "strength": 0.85},
+                            {"id": "style-a-id", "strength": 0.8},
+                            {"id": "style-b-id", "strength": 0.85},
                             {"id": "disabled-id", "enabled": False, "strength": 0.9},
                         ],
                     },
@@ -271,13 +271,13 @@ class Krea2MossPublicWorkflowTests(unittest.TestCase):
                 self.assertIn("extra_lora_2", prompt)
                 self.assertNotIn("extra_lora_3", prompt)
                 self.assertEqual(prompt["extra_lora_1"]["class_type"], "LoraLoaderModelOnly")
-                self.assertEqual(prompt["extra_lora_1"]["inputs"], {"model": ["2", 0], "lora_name": "wooden_horse_Moss.safetensors", "strength_model": 0.8})
-                self.assertEqual(prompt["extra_lora_2"]["inputs"], {"model": ["extra_lora_1", 0], "lora_name": "shibaribondageV1.1-moss.safetensors", "strength_model": 0.85})
+                self.assertEqual(prompt["extra_lora_1"]["inputs"], {"model": ["2", 0], "lora_name": "demo_style_a.safetensors", "strength_model": 0.8})
+                self.assertEqual(prompt["extra_lora_2"]["inputs"], {"model": ["extra_lora_1", 0], "lora_name": "demo_style_b.safetensors", "strength_model": 0.85})
                 self.assertEqual(prompt["9"]["inputs"]["model"], ["extra_lora_2", 0])
                 req_loras = [m.get("comfy_name") or m.get("filename") for m in built["required_models"] if m.get("kind") == "loras"]
-                self.assertIn("wooden_horse_Moss.safetensors", req_loras)
-                self.assertIn("shibaribondageV1.1-moss.safetensors", req_loras)
-                self.assertNotIn("straight-arm-moss.safetensors", req_loras)
+                self.assertIn("demo_style_a.safetensors", req_loras)
+                self.assertIn("demo_style_b.safetensors", req_loras)
+                self.assertNotIn("demo_style_disabled.safetensors", req_loras)
 
     def test_krea2_dual_stage_splices_extra_lora_onto_moss_stage(self):
         catalog = [

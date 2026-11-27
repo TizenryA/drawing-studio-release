@@ -125,7 +125,7 @@ test('injectTriggerIntoMossLayout, snap16, and stripNegativeTextConflicts behave
   assert.equal(injectTriggerIntoMossLayout(withTrigger, 'custom_style'), withTrigger);
 
   // Plain text fallback
-  assert.equal(injectTriggerIntoMossLayout('1girl', 'a wooden submission horse'), '1girl, a wooden submission horse');
+  assert.equal(injectTriggerIntoMossLayout('1girl', 'painterly style'), '1girl, painterly style');
 
   // Negative conflict stripping removes bare text/speech bubbles while preserving gibberish text/watermark
   assert.equal(
