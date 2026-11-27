@@ -84,10 +84,11 @@
 1. **Colab 生命周期状态机**：
    - 状态枚举：`off` → `allocating` → `bootstrapping` → `syncing` → `starting` → `starting_comfy` → `ready`，异常/结束态包括 `stopping`、`disconnected`、`allocation_unknown`、`error`。
    - `start()` 前通过 `reserve_start()` 原子占位防止并发重复申请 GPU；若开机或释放遇到模棱两可的网络异常，切入 `allocation_unknown` 并保留句柄等待人工核对/重置，不盲目重开第二个实例。
-2. **安全设置与凭据管理**：
+2. **安全设置与独立 OAuth2 授权管理（`backend/oauth_flow.py` + `web/src/components/OAuthPanel.jsx`）**：
    - 管理员密码使用随机 16 字节盐 + `hashlib.scrypt(n=16384, r=8, p=1)` 存储；登录颁发 30 天有效 `drawing_session` HttpOnly Strict Cookie。
+   - 内置独立的 Google Colab 与 Google Drive 授权向导，支持三种绑定方式：**PKCE 手动复制授权码/回调 URL**、**同源 HTTPS 弹窗回调**（`/api/oauth/{purpose}/callback`，由一次性高熵 `state` 令牌防护 CSRF）、**直接导入已有 JSON 凭据并联网验活**，以及 **测试连通性** 与 **解绑清理**。
+   - 凭据通过 `private_json` 严格以 `0600` 权限落盘至 `colab.json` / `drive.json`；`GET /api/settings` 与 `/api/oauth/*` 自动脱敏所有 `*token*`、`*secret*`、`*credential*`、`password_hash` 字段，仅返回掩码后 `client_id_preview` 与 `account_email`。
    - 支持创建/查看前缀/随时吊销 `ds-...` 格式 API Key；`/v1/*` 请求记录耗时、状态码和 Key ID（`GET /api/requests`）。
-   - `GET /api/settings` 自动脱敏所有 `*token*`、`*secret*`、`*credential*`、`password_hash` 字段。
 
 ---
 
@@ -97,6 +98,7 @@
 | :--- | :--- |
 | [backend/main.py](./backend/main.py) | FastAPI 应用入口、生命周期管理（`lifespan`）、中间件鉴权、全部 `/api/*` 与 `/v1/*` 路由、`/comfy/*` HTTP/WS 代理、SSE `/api/events`、空闲自动关机看门狗 `idle_watchdog` |
 | [backend/auth.py](./backend/auth.py) | `Auth`：scrypt 密码校验、30 天 Session Cookie、可吊销 `ds-...` API Key |
+| [backend/oauth_flow.py](./backend/oauth_flow.py) | `OAuthFlowManager`：Google Colab / Drive 独立 OAuth2 PKCE、同源回调、凭据导入验活与连通性测试 |
 | [backend/database.py](./backend/database.py) | `Database`：SQLite WAL 封装、主表 `records(kind, id, payload)`、二级索引 `gallery_index` 与 `tasks_index`、轻量摘要构造 |
 | [backend/runtime.py](./backend/runtime.py) | `OAuth` 与 `Runtime`：Colab OAuth 自动刷新、隧道交互（`/tun/m/*`）、Jupyter Kernel WebSocket 命令执行、断连检测、CU 计费与显存探测 |
 | [backend/comfy.py](./backend/comfy.py) | `Comfy`：在 Colab 内核侧执行 ComfyUI HTTP/WS 代理请求、多端口健康探测、Drive 模型分块断点下载到 Colab 磁盘 |
@@ -110,8 +112,10 @@
 | [web/src/pages/Tasks.jsx](./web/src/pages/Tasks.jsx) | 任务列表、实时状态、任务详情快照、耗时/CU 拆解、取消与一键复用 |
 | [web/src/pages/Models.jsx](./web/src/pages/Models.jsx) | 模型检索、家族/状态筛选、GPU 同步/批量同步/取消/清缓存、工作流管理与编辑器 |
 | [web/src/pages/Gallery.jsx](./web/src/pages/Gallery.jsx) | 项目文件夹侧栏/筛选、分页图库、详情弹窗（缩略图→高清预览→全屏原图）、批量操作、导入与视频拼接弹窗 |
-| [web/src/pages/Machine.jsx](./web/src/pages/Machine.jsx) | GPU 选择与开机/关机/重启/重置控制、CU 配额与显存进度、运行时日志 |
-| [web/src/pages/Settings.jsx](./web/src/pages/Settings.jsx) | 主题切换、Drive 根目录与自动瘦身开关、并发数配置、API Key 管理与请求日志、密码修改 |
+| [web/src/pages/Machine.jsx](./web/src/pages/Machine.jsx) | GPU 选择与开机/关机/重启/重置控制、CU 配额与显存进度、未授权快捷跳转与运行时日志 |
+| [web/src/pages/Settings.jsx](./web/src/pages/Settings.jsx) | 主题切换、内嵌 Colab/Drive OAuth 授权面板、Drive 根目录与自动瘦身、并发数、API Key 与密码修改 |
+| [web/src/components/OAuthPanel.jsx](./web/src/components/OAuthPanel.jsx) | Google Colab & Drive 独立授权向导面板（PKCE 手动授权 / Web 回调 / JSON 导入 / 连通性测试 / 解绑） |
+| [web/src/oauthHelpers.js](./web/src/oauthHelpers.js) | GCP `client_secret*.json` 与已有凭据 JSON 解析校验辅助 |
 | [web/src/machineState.js](./web/src/machineState.js) | 运行时状态判定与前端展示语义映射（`v1.0.42` 新增） |
 | [web/src/mossLayout.js](./web/src/mossLayout.js) | MOSS 坐标排版预设、16 倍数吸附、编译/反编译、缩放与冲突负向词清理 |
 | [web/src/promptParser.js](./web/src/promptParser.js) | 混排文档多提示词批量解析器（支持 Markdown/代码围栏/参数表与防笔记污染） |
@@ -130,7 +134,7 @@
 
 ### 4.1 公开与鉴权路由
 
-- **公开路由（仅 3 个）**：`GET /api/health`、`GET /api/auth/status`、`POST /api/auth/login`。
+- **公开路由**：`GET /api/health`、`GET /api/auth/status`、`POST /api/auth/login`；以及由一次性高熵 `state` 令牌防护的 Google OAuth 回调端点 `GET /api/oauth/colab/callback`、`GET /api/oauth/drive/callback`。
 - **其余全部路由**（`/api/*`、`/v1/*`、`/comfy/*`、WS `/comfy/ws`）必须携带有效 `drawing_session` Cookie 或 `Authorization: Bearer ds-...`。
 
 ### 4.2 核心 API 分组
@@ -138,6 +142,7 @@
 | 分组 | 端点 |
 | :--- | :--- |
 | 鉴权与设置 | `POST /api/auth/logout`、`GET/PATCH /api/settings`、`GET/POST /api/keys`、`DELETE /api/keys/{key_id}`、`GET /api/requests`、`GET /api/events` |
+| OAuth 独立授权 | `GET /api/oauth/status`、`POST /api/oauth/{purpose}/start`、`POST /api/oauth/{purpose}/exchange`、`GET /api/oauth/{purpose}/callback`、`POST /api/oauth/{purpose}/import`、`POST /api/oauth/{purpose}/test`、`DELETE /api/oauth/{purpose}` |
 | 运行时 | `GET /api/runtime`、`GET /api/runtime/gpus`、`GET /api/runtime/logs`、`POST /api/runtime/start`、`POST /api/runtime/stop`、`POST /api/runtime/reset`、`POST /api/runtime/recover`、`POST /api/runtime/restart` |
 | 模型与工作流 | `GET /api/models`、`POST /api/models/scan`、`PATCH/DELETE /api/models/{model_id}`、`POST /api/models/{model_id}/sync`、`POST /api/models/sync-batch`、`POST /api/models/{model_id}/sync/cancel`、`DELETE /api/models/{model_id}/cache`、`GET/POST /api/workflows`、`GET/DELETE /api/workflows/{workflow_id}`、`GET/POST/DELETE /api/presets` |
 | 任务与上传 | `GET/POST /api/tasks`、`GET /api/tasks/{task_id}`、`POST /api/tasks/{task_id}/cancel`、`POST/GET /api/uploads` |

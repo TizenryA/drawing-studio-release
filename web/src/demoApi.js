@@ -574,6 +574,97 @@ export async function demoApi(rawPath, options = {}) {
     return { path: thumb, filename: name, url: thumb };
   }
 
+  if (path === '/api/oauth/status' && method === 'GET') {
+    return clone(state.oauth);
+  }
+  if (path.startsWith('/api/oauth/')) {
+    const parts = path.split('/').filter(Boolean);
+    const purpose = decodeURIComponent(parts[2] || '');
+    if (!['colab', 'drive'].includes(purpose)) throw new Error(`不支持的授权目标：${purpose}`);
+    const action = parts[3] || '';
+    const record = state.oauth[purpose];
+
+    if (method === 'DELETE' && !action) {
+      record.configured = false;
+      record.has_refresh_token = false;
+      record.token_valid = false;
+      record.account_email = '';
+      state.settings[`${purpose}_configured`] = false;
+      state.settings[`${purpose}_account_email`] = '';
+      return { ok: true, purpose, status: clone(record) };
+    }
+
+    if (action === 'start' && method === 'POST') {
+      const cid = String(body.client_id || '').trim() || (record.has_client_id ? 'demo-client-existing.apps.googleusercontent.com' : '');
+      if (!cid) throw new Error(`请先填写 ${purpose.toUpperCase()} Client ID`);
+      const flowId = `demo-flow-${++state.seq}`;
+      const flowState = `demo-state-${state.seq}`;
+      const redirectUri = body.redirect_uri || record.default_manual_redirect_uri;
+      state.oauthFlows[flowId] = { purpose, flowMode: body.flow_mode || 'manual', clientId: cid, redirectUri, state: flowState };
+      const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(cid)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(record.scopes.join(' '))}&code_challenge_method=S256&state=${encodeURIComponent(flowState)}`;
+      return {
+        flow_id: flowId,
+        purpose,
+        flow_mode: body.flow_mode || 'manual',
+        auth_url: authUrl,
+        redirect_uri: redirectUri,
+        state: flowState,
+        scopes: clone(record.scopes),
+        expires_in: 900,
+      };
+    }
+
+    if (action === 'exchange' && method === 'POST') {
+      const flow = state.oauthFlows[body.flow_id];
+      if (!flow || flow.purpose !== purpose) throw new Error('Demo 授权会话不存在或已过期');
+      if (!String(body.code_or_url || '').trim()) throw new Error('请粘贴授权码或回调 URL');
+      delete state.oauthFlows[body.flow_id];
+      record.configured = true;
+      record.has_client_id = true;
+      record.has_refresh_token = true;
+      record.token_valid = true;
+      record.account_email = purpose === 'colab' ? 'colab-demo@example.com' : 'drive-demo@example.com';
+      state.settings[`${purpose}_configured`] = true;
+      state.settings[`${purpose}_account_email`] = record.account_email;
+      return { ok: true, purpose, account_email: record.account_email, status: clone(record) };
+    }
+
+    if (action === 'import' && method === 'POST') {
+      const cred = typeof body.credential_json === 'string' ? JSON.parse(body.credential_json) : (body.credential_json || body);
+      if (!cred?.client_id || !cred?.refresh_token) throw new Error('凭据 JSON 必须包含 client_id 与 refresh_token');
+      record.configured = true;
+      record.has_client_id = true;
+      record.has_refresh_token = true;
+      record.token_valid = true;
+      record.account_email = cred.account_email || (purpose === 'colab' ? 'colab-imported@example.com' : 'drive-imported@example.com');
+      record.client_id_preview = `${String(cred.client_id).slice(0, 8)}...`;
+      state.settings[`${purpose}_configured`] = true;
+      state.settings[`${purpose}_account_email`] = record.account_email;
+      return { ok: true, purpose, verified: body.verify !== false, account_email: record.account_email, status: clone(record) };
+    }
+
+    if (action === 'test' && method === 'POST') {
+      if (!record.configured) throw new Error(`${purpose} 尚未配置凭据`);
+      return purpose === 'colab'
+        ? {
+            ok: true,
+            purpose: 'colab',
+            account_email: record.account_email,
+            balance: state.runtime.quota.balance,
+            gpus: state.gpus.gpus.map(g => g.id),
+            message: `[Demo] Colab 连通正常（可用 GPU：G4 / H100 / A100 / L4 / T4 · 余额 ${state.runtime.quota.balance} CU）`,
+            status: clone(record),
+          }
+        : {
+            ok: true,
+            purpose: 'drive',
+            account_email: record.account_email,
+            message: `[Demo] Drive 连通正常（${record.account_email}）`,
+            status: clone(record),
+          };
+    }
+  }
+
   throw new Error(`Demo 模式暂未模拟接口：${method} ${path}`);
 }
 

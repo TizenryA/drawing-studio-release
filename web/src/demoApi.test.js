@@ -83,3 +83,32 @@ test('demoApi handles gallery filters, projects, upscaled parent compare, and ta
   assert.equal(afterGallery.total, 1);
   resetDemoState('/');
 });
+
+test('demoApi simulates OAuth status, manual PKCE start/exchange, import, test, and disconnect', async () => {
+  resetDemoState('/');
+  const st0 = await demoApi('/api/oauth/status');
+  assert.equal(st0.colab.configured, true);
+  assert.equal(st0.drive.configured, true);
+
+  await demoApi('/api/oauth/drive', { method: 'DELETE' });
+  const st1 = await demoApi('/api/oauth/status');
+  assert.equal(st1.drive.configured, false);
+
+  const started = await demoApi('/api/oauth/drive/start', {
+    method: 'POST',
+    body: JSON.stringify({ client_id: 'custom-cid.apps.googleusercontent.com', flow_mode: 'manual' }),
+  });
+  assert.ok(started.auth_url.includes('code_challenge_method=S256'));
+
+  const exchanged = await demoApi('/api/oauth/drive/exchange', {
+    method: 'POST',
+    body: JSON.stringify({ flow_id: started.flow_id, code_or_url: 'http://127.0.0.1:8765/callback?code=demo-code' }),
+  });
+  assert.equal(exchanged.ok, true);
+  assert.equal(exchanged.status.configured, true);
+
+  const probed = await demoApi('/api/oauth/colab/test', { method: 'POST' });
+  assert.equal(probed.ok, true);
+  assert.ok(probed.message.includes('Colab'));
+  resetDemoState('/');
+});

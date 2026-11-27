@@ -527,7 +527,7 @@ export default function App() {
         </header>
 
         <ErrorBox error={errors.runtime} retry={() => refresh(['runtime'])} />
-        <div hidden={page !== 'machine'}><Machine {...common} /></div>
+        <div hidden={page !== 'machine'}><Machine {...common} openSettings={() => setSettingsOpen(true)} /></div>
         <div hidden={page !== 'tasks'}><Tasks {...common} active={page === 'tasks'} error={errors.tasks} /></div>
         <div hidden={page !== 'draw'}><Draw {...common} params={params} setParams={setParams} errors={errors} /></div>
         <div hidden={page !== 'models'}><Models {...common} onUse={useModel} error={errors.models} /></div>

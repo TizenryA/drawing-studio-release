@@ -13,7 +13,7 @@ const GPU_HINTS = {
   T4: '16 GB 显存 · 入门测试',
 };
 
-export default function Machine({ runtime, runtimeError, runtimeAction, settings, tasks, models = [], workflows = [], refresh }) {
+export default function Machine({ runtime, runtimeError, runtimeAction, settings, tasks, models = [], workflows = [], refresh, openSettings }) {
   const [gpus, setGpus] = useState([]);
   const [gpuInfo, setGpuInfo] = useState(null);
   const [gpu, setGpu] = useState('');
@@ -96,6 +96,16 @@ export default function Machine({ runtime, runtimeError, runtimeAction, settings
   return (
     <div className="machine-layout">
       <div className="stack">
+        {settings?.colab_configured === false && (
+          <div className="machine-auth-alert" role="status">
+            <span>尚未绑定 Google Colab 账号，开机前需先完成 OAuth 授权或导入凭据。</span>
+            {openSettings && (
+              <Button primary className="mini-btn" onClick={openSettings}>
+                前往设置完成授权
+              </Button>
+            )}
+          </div>
+        )}
         <section className="machine-card">
           <div className="row between">
             <Status state={runtime?.state} />

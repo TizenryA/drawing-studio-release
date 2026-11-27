@@ -1,6 +1,7 @@
 """Drawing Studio: independent, single-user ComfyUI control plane."""
 import asyncio
 import base64
+import html
 import io
 import json
 import mimetypes
@@ -14,7 +15,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request, UploadFile, File, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse, JSONResponse, StreamingResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, StreamingResponse, Response
 from fastapi.staticfiles import StaticFiles
 from .database import Database
 from .auth import Auth, password_hash
@@ -36,8 +37,16 @@ if not initial:
     db.save('settings', {'id': 'main', 'password_hash': password_hash(password), 'theme': 'system', 'mode': 'temporary', 'comfy_workers': 1, 'idle_minutes': 60, 'drive_root_name': 'DrawingStudio', 'prune_local_after_archive': True})
 auth = Auth(db)
 listeners = set()
-runtime = drive = comfy = workflows = tasks = gallery = None
+runtime = drive = comfy = workflows = tasks = gallery = oauth_flows = None
 background = set()
+
+
+def _oauth_manager():
+    global oauth_flows
+    if oauth_flows is None:
+        from .oauth_flow import OAuthFlowManager
+        oauth_flows = OAuthFlowManager(runtime, drive)
+    return oauth_flows
 
 
 def settings():
@@ -63,17 +72,19 @@ def spawn(coroutine):
 
 @asynccontextmanager
 async def lifespan(app):
-    global runtime, drive, comfy, workflows, tasks, gallery
+    global runtime, drive, comfy, workflows, tasks, gallery, oauth_flows
     from .runtime import Runtime
     from .drive import Drive
     from .comfy import Comfy
     from .workflows import WorkflowStore
     from .tasks import Tasks
+    from .oauth_flow import OAuthFlowManager
     runtime = Runtime(settings, emit)
     drive = Drive(settings)
     comfy = Comfy(runtime)
     workflows = WorkflowStore(DATA)
     gallery = Gallery(db, drive, DATA, settings=settings)
+    oauth_flows = OAuthFlowManager(runtime, drive)
     tasks = Tasks(db, runtime, comfy, drive, workflows, emit, gallery=gallery, sync_model=sync_model)
     await tasks.start()
     watchdog = spawn(idle_watchdog())
@@ -96,7 +107,14 @@ app = FastAPI(title='Drawing Studio', version='1.0.42', lifespan=lifespan)
 @app.middleware('http')
 async def authenticate(request: Request, call_next):
     protected = request.url.path.startswith(('/api/', '/v1/', '/comfy/'))
-    if protected and request.url.path not in {'/api/auth/login', '/api/auth/status', '/api/health'}:
+    public_paths = {
+        '/api/auth/login',
+        '/api/auth/status',
+        '/api/health',
+        '/api/oauth/colab/callback',
+        '/api/oauth/drive/callback',
+    }
+    if protected and request.url.path not in public_paths:
         try:
             request.state.identity = auth.check(request)
         except HTTPException as exc:
@@ -162,8 +180,17 @@ def _invalidate_task_caches():
 @app.get('/api/settings')
 async def get_settings():
     result = {k: v for k, v in settings().items() if k not in PRIVATE_FIELDS and 'token' not in k and 'secret' not in k and 'credential' not in k}
-    result['drive_configured'] = bool(drive and drive.oauth.path.is_file())
-    result['colab_configured'] = bool(runtime and runtime.oauth.path.is_file())
+    if runtime and drive:
+        st = _oauth_manager().all_status()
+        result['drive_configured'] = st['drive']['configured']
+        result['colab_configured'] = st['colab']['configured']
+        result['drive_account_email'] = st['drive']['account_email']
+        result['colab_account_email'] = st['colab']['account_email']
+    else:
+        result['drive_configured'] = bool(drive and drive.oauth.path.is_file())
+        result['colab_configured'] = bool(runtime and runtime.oauth.path.is_file())
+        result['drive_account_email'] = ''
+        result['colab_account_email'] = ''
     if result.get('prune_local_after_archive') is None:
         result['prune_local_after_archive'] = True
     if result.get('comfy_workers') is None:
@@ -225,6 +252,123 @@ async def revoke_key(key_id: str):
 @app.get('/api/requests')
 async def request_log():
     return db.list('requests')
+
+
+@app.get('/api/oauth/status')
+async def oauth_status(request: Request):
+    return _oauth_manager().all_status(request)
+
+
+@app.post('/api/oauth/{purpose}/start')
+async def oauth_start(purpose: str, request: Request):
+    from .oauth_flow import resolve_callback_url
+    raw = await request.body()
+    body = json.loads(raw) if raw else {}
+    return _oauth_manager().start(purpose, body, callback_url=resolve_callback_url(request, purpose))
+
+
+@app.post('/api/oauth/{purpose}/exchange')
+async def oauth_exchange(purpose: str, request: Request):
+    body = await request.json()
+    return await _oauth_manager().exchange(
+        purpose,
+        flow_id=body.get('flow_id'),
+        state=body.get('state'),
+        code_or_url=body.get('code_or_url') or body.get('code') or '',
+    )
+
+
+def _oauth_callback_html(*, purpose: str, ok: bool, account_email: str = '', error: str = '') -> str:
+    label = 'Google Colab' if purpose == 'colab' else 'Google Drive'
+    title = f'{label} 授权完成' if ok else f'{label} 授权未完成'
+    heading = html.escape(title)
+    detail = (
+        f'已绑定账号：{html.escape(account_email)}。你可以关闭此窗口并返回 Drawing Studio。'
+        if ok and account_email
+        else '授权凭据已安全保存至服务端，请关闭此窗口返回 Drawing Studio。'
+        if ok
+        else html.escape(error or '授权失败')
+    )
+    payload_json = json.dumps(
+        {
+            'type': 'studio:oauth-complete',
+            'purpose': purpose,
+            'ok': ok,
+            'account_email': account_email,
+            'error': error,
+        },
+        ensure_ascii=False,
+    ).replace('<', '\\u003c')
+    badge_bg = '#dcfce7' if ok else '#fee2e2'
+    badge_fg = '#15803d' if ok else '#b91c1c'
+    return f"""<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{heading}</title>
+  <style>
+    body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 0; min-height: 100vh; display: grid; place-items: center; background: #f6f7f9; color: #15171c; padding: 20px; }}
+    .card {{ max-width: 460px; width: 100%; background: #fff; border: 1px solid #e2e6ed; border-radius: 14px; padding: 24px; box-shadow: 0 8px 28px rgba(0,0,0,.06); }}
+    .badge {{ display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; background: {badge_bg}; color: {badge_fg}; margin-bottom: 12px; }}
+    h1 {{ font-size: 18px; margin: 0 0 10px; }}
+    p {{ font-size: 14px; line-height: 1.6; color: #4b5563; margin: 0 0 16px; word-break: break-word; }}
+    button {{ border: 1px solid #d1d5db; background: #14171f; color: #fff; border-radius: 9px; padding: 8px 14px; font-size: 13px; cursor: pointer; }}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <span class="badge">{'SUCCESS' if ok else 'ERROR'}</span>
+    <h1>{heading}</h1>
+    <p>{detail}</p>
+    <button type="button" onclick="window.close()">关闭窗口</button>
+  </div>
+  <script>
+    (function () {{
+      var msg = {payload_json};
+      try {{
+        if (window.opener && window.location && window.location.origin) {{
+          window.opener.postMessage(msg, window.location.origin);
+        }}
+      }} catch (e) {{}}
+      if (msg.ok) {{
+        setTimeout(function () {{ try {{ window.close(); }} catch (e) {{}} }}, 1200);
+      }}
+    }})();
+  </script>
+</body>
+</html>"""
+
+
+@app.get('/api/oauth/{purpose}/callback')
+async def oauth_callback(purpose: str, request: Request, code: str = '', state: str = '', error: str = '', error_description: str = ''):
+    from .oauth_flow import validate_purpose
+    from .runtime import AdapterError
+    safe_purpose = purpose
+    try:
+        safe_purpose = validate_purpose(purpose)
+        if error:
+            detail = f'{error}: {error_description}' if error_description else error
+            raise ValueError(f'Google 授权被拒绝或取消（{detail}）')
+        res = await _oauth_manager().exchange(safe_purpose, state=state, code_or_url=code)
+        return HTMLResponse(_oauth_callback_html(purpose=safe_purpose, ok=True, account_email=res.get('account_email', '')))
+    except (ValueError, AdapterError) as exc:
+        return HTMLResponse(_oauth_callback_html(purpose=safe_purpose, ok=False, error=str(exc)), status_code=400)
+
+
+@app.post('/api/oauth/{purpose}/import')
+async def oauth_import(purpose: str, request: Request):
+    return await _oauth_manager().import_credentials(purpose, await request.json())
+
+
+@app.post('/api/oauth/{purpose}/test')
+async def oauth_test(purpose: str):
+    return await _oauth_manager().test_connection(purpose)
+
+
+@app.delete('/api/oauth/{purpose}')
+async def oauth_disconnect(purpose: str):
+    return _oauth_manager().disconnect(purpose)
 
 
 @app.get('/api/runtime')

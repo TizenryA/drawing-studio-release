@@ -132,28 +132,25 @@
 
 ## 快速部署
 
-### 1. 准备 Colab 与 Google Drive OAuth 凭据
-
-将已有 Colab CLI 和 Google Drive OAuth 授权的私有凭据放入项目的 `config/private/` 目录（Colab 与 Drive 可以使用两个不同的 Google 账号）：
-
-- `config/private/colab.json`
-- `config/private/drive.json`
-
-凭据 JSON 需包含 `client_id`、`refresh_token` 及可选的 `client_secret`、`access_token`、`expires_at`。运行时若 token 过期会自动刷新并原子写回原文件，因此容器挂载的 `./config` 目录必须可写。
+### 1. 准备数据目录并启动容器服务
 
 ```bash
 mkdir -p data config/private
 chmod 700 config/private
-chmod 600 config/private/colab.json config/private/drive.json
-```
-
-### 2. 启动容器服务
-
-```bash
 docker compose up -d --build
 ```
 
 默认监听宿主 `127.0.0.1:8790`（详见 [compose.yaml](./compose.yaml)）。首次启动若未设置环境变量 `DRAWING_PASSWORD`，系统会随机生成管理员密码并写入 `data/admin-password`（权限 `0600`），登录后可在右上角 **设置 → 管理员密码** 修改。
+
+### 2. 配置 Colab 与 Google Drive 独立授权（支持界面内向导）
+
+不再需要手动在服务器拼接 JSON，登录前端工作台后打开右上角 **设置 → 账号授权（Google Colab / Google Drive）** 即可直接完成两个独立 Google 账号的绑定：
+
+- **手动复制授权码（PKCE，无需公网回调域名）**：支持直接导入 GCP `client_secret_*.json` 或填写 `Client ID`，生成带 `S256` PKCE 的授权链接；在浏览器完成 Google 登录授权后，把跳转后的完整地址（即使浏览器提示 `127.0.0.1` 无法打开也正常）粘贴回第 2 步即可换取并原子保存 `0600` 凭据。
+- **同源弹窗回调（Web）**：配合 HTTPS 反向代理使用时，复制页面展示的 `/api/oauth/{colab|drive}/callback` 回调地址添加到 GCP 客户端白名单，即可点击 **弹窗打开 Google 授权** 自动完成回传。
+- **导入凭据 JSON & 连通性探测**：兼容直接上传/粘贴已有 `colab.json` / `drive.json`（可选保存前实时校验 `refresh_token`），并提供 **测试连通性**（实时探测 Colab 可用 GPU/CU 余额与 Drive 登录邮箱）与 **解绑** 按钮。
+
+> 运行时 Token 过期会自动刷新并写回 `config/private/colab.json` 与 `config/private/drive.json`，因此请保证 `./config` 挂载目录可写；也支持通过环境变量 `DRAWING_COLAB_CLIENT_ID` / `DRAWING_DRIVE_CLIENT_ID` 等预置公共 Client ID。
 
 ### 3. 配置 HTTPS 反向代理
 
