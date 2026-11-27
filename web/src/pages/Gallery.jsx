@@ -447,6 +447,10 @@ export default function Gallery({
             <Button
               disabled={!selected.length || busy}
               onClick={async () => {
+                if (__DEMO_MODE__) {
+                  setNotice('Demo 模式已模拟批量打包下载（单张作品可在详情页直接下载）');
+                  return;
+                }
                 setBusy(true);
                 try {
                   const response = await fetch('/api/gallery/batch', {

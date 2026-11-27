@@ -46,7 +46,7 @@ export default function MediaPreview({
     return (
       <video
         key={item.id}
-        src={`/api/gallery/${enc(item.id)}/media`}
+        src={item.media_url || `/api/gallery/${enc(item.id)}/media`}
         poster={item.thumbnail_url}
         controls
         playsInline

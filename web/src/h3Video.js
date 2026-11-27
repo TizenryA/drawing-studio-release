@@ -154,4 +154,4 @@ export function moveReference(paths,index,delta){
  if(target<0||target>=next.length)return next;
  [next[index],next[target]]=[next[target],next[index]];return next;
 }
-export const referenceThumbnail=path=>'/api/uploads/'+encodeURIComponent(String(path).replace(/\\/g,'/').split('/').pop());
+export const referenceThumbnail=path=>{const s=String(path??'');return /^(data:|blob:|https?:\/\/)/i.test(s)?s:'/api/uploads/'+encodeURIComponent(s.replace(/\\/g,'/').split('/').pop());};

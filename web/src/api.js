@@ -1,6 +1,17 @@
+export const IS_DEMO = __DEMO_MODE__;
+export const resetDemo = async () => {
+  if (__DEMO_MODE__) {
+    const m = await import('./demoApi.js');
+    m.resetDemoState();
+  }
+};
 export const list = value => Array.isArray(value) ? value : (value?.items || value?.data || []);
 export const enc = value => encodeURIComponent(value);
 export async function api(path, options = {}) {
+  if (__DEMO_MODE__) {
+    const m = await import('./demoApi.js');
+    return m.demoApi(path, options);
+  }
   const controller=path==='/api/runtime'?new AbortController():null;
   const timer=controller?setTimeout(()=>controller.abort(),20000):null;
   try {
@@ -21,8 +32,18 @@ export async function api(path, options = {}) {
 export const post = (path,body={}) => api(path,{method:'POST',body:JSON.stringify(body)});
 export const patch = (path,body) => api(path,{method:'PATCH',body:JSON.stringify(body)});
 export const remove = path => api(path,{method:'DELETE'});
-export async function upload(file) { const body=new FormData();body.append('file',file);return api('/api/uploads',{method:'POST',body}); }
+export async function upload(file) {
+  if (__DEMO_MODE__) {
+    const m = await import('./demoApi.js');
+    return m.demoUpload(file);
+  }
+  const body=new FormData();body.append('file',file);return api('/api/uploads',{method:'POST',body});
+}
 export async function download(path,name) {
+  if (__DEMO_MODE__) {
+    const m = await import('./demoApi.js');
+    return m.demoDownload(path,name);
+  }
   const response=await fetch(path,{credentials:'include'});
   if(!response.ok){let detail;try{detail=(await response.json()).detail;}catch{}throw new Error(detail||`下载失败（HTTP ${response.status}）`);}
   const url=URL.createObjectURL(await response.blob());const a=document.createElement('a');a.href=url;a.download=name||'drawing-studio.png';a.click();setTimeout(()=>URL.revokeObjectURL(url),10000);

@@ -1,6 +1,9 @@
 # Drawing Studio (`v1.0.42`)
 
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](./LICENSE)
+[![Live Preview](https://img.shields.io/badge/Demo-%E5%9C%A8%E7%BA%BF%E5%89%8D%E7%AB%AF%E9%A2%84%E8%A7%88-0ea5e9.svg)](https://tizenrya.github.io/drawing-studio-release/)
+
+> **[在线交互前端预览（GitHub Pages Demo）](https://tizenrya.github.io/drawing-studio-release/)** — 纯浏览器本地状态模拟，无需部署后端或 GPU 即可直接体验 5 大工作台页面、38 个内置/公开工作流、MOSS 可视化坐标排版器与图库交互。
 
 **把 Google Colab 按需 GPU、Google Drive 持久化存储与完整 ComfyUI 节点引擎，装进一台轻量 VPS 的个人 AI 影像创作工作台。**
 

@@ -1256,3 +1256,51 @@ progress::-moz-progress-bar { background: var(--info); }
   padding: 4px 8px !important;
   font-size: 12px !important;
 }
+
+.demo-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  margin: 12px 16px 0;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--info-bg);
+  border: 1px solid color-mix(in srgb, var(--info) 30%, transparent);
+  font-size: 12px;
+  color: var(--fg);
+}
+.demo-banner-text {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.demo-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--info);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+}
+.demo-banner-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.demo-banner-btn {
+  padding: 4px 10px;
+  border-radius: 7px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--fg);
+  font-size: 12px;
+  font-weight: 550;
+}
+.demo-banner-btn:hover {
+  border-color: var(--info);
+}

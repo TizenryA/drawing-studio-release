@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Cpu, PenLine, Boxes, Images, Settings, Check, LogIn } from 'lucide-react';
-import { api, list, post } from './api';
+import { api, list, post, resetDemo } from './api';
 import { IconButton, ErrorBox, Status, isTaskActive } from './ui';
 import Machine from './pages/Machine';
 import { videoPayload } from './h3Video';
@@ -18,6 +18,26 @@ const pages = [
   ['models', '模型', Boxes],
   ['gallery', '图库', Images],
 ];
+
+const DEMO_DEFAULT_DRAFT = {
+  workflow: 'moss-sft',
+  workflow_id: 'moss-sft',
+  mode: 'custom',
+  model: 'moss-image-sft-int8',
+  loras: [],
+  prompt: '1girl, ink wash anime editorial illustration, lantern courtyard at twilight, warm rim light, crisp lineart',
+  negative_prompt: 'lowres, blurry, bad anatomy, extra fingers',
+  width: 896,
+  height: 1280,
+  steps: 28,
+  cfg: 3.5,
+  shift: 3.5,
+  sampler: 'er_sde',
+  scheduler: 'simple',
+  seed: -1,
+  n: 1,
+  project: '角色设定',
+};
 
 const stored = (key, fallback) => {
   try {
@@ -39,7 +59,11 @@ export default function App() {
   const [galleryProjects, setGalleryProjects] = useState({ projects: [], total: 0, unassigned_count: 0 });
   const [errors, setErrors] = useState({});
   const [theme, setTheme] = useState(() => stored('studio-theme', 'light'));
-  const [params, setParams] = useState(() => ({ ...defaultParams, ...stored('studio-draft', {}) }));
+  const [params, setParams] = useState(() => {
+    const savedDraft = stored('studio-draft', null);
+    if (savedDraft) return { ...defaultParams, ...savedDraft };
+    return __DEMO_MODE__ ? { ...defaultParams, ...DEMO_DEFAULT_DRAFT } : { ...defaultParams };
+  });
   const [login, setLogin] = useState(false);
   const [notice, setNotice] = useState('');
   const [loginError, setLoginError] = useState('');
@@ -158,6 +182,25 @@ export default function App() {
   }, [refresh, refreshProjects]);
 
   useEffect(() => {
+    if (__DEMO_MODE__) {
+      sseConnectedRef.current = true;
+      const onTask = e => {
+        const data = e?.detail;
+        if (!data?.id) return;
+        setTasks(old => upsertTaskList(old, data, 40));
+        if (data.status === 'completed' && !completedIdsRef.current.has(data.id)) {
+          completedIdsRef.current.add(data.id);
+          window.dispatchEvent(new Event('studio:gallery-dirty'));
+          refreshProjects();
+          refresh(['runtime']);
+        }
+      };
+      window.addEventListener('studio:task-event', onTask);
+      return () => {
+        sseConnectedRef.current = false;
+        window.removeEventListener('studio:task-event', onTask);
+      };
+    }
     if (login || typeof EventSource === 'undefined') {
       sseConnectedRef.current = false;
       return;
@@ -413,12 +456,39 @@ export default function App() {
     return () => window.removeEventListener('studio:gallery-changed', f);
   }, [refresh, refreshProjects]);
 
+  const handleResetDemo = async () => {
+    await resetDemo();
+    try { localStorage.removeItem('studio-draft'); } catch {}
+    lastPayload.current = {};
+    completedIdsRef.current.clear();
+    tasksBootstrappedRef.current = false;
+    setParams({ ...defaultParams, ...DEMO_DEFAULT_DRAFT });
+    await refresh();
+    await refreshProjects();
+    window.dispatchEvent(new Event('studio:refresh'));
+    window.dispatchEvent(new Event('studio:params-replaced'));
+    window.dispatchEvent(new Event('studio:gallery-dirty'));
+    setNotice('演示环境已重置为初始状态');
+  };
+
   const activeCount = tasks.filter(isTaskActive).length;
   const cuBalance = runtime?.quota?.balance;
   const cuRate = runtime?.quota?.consumption_rate;
 
   return (
     <div className="app">
+      {__DEMO_MODE__ && (
+        <div className="demo-banner" role="region" aria-label="在线演示说明">
+          <div className="demo-banner-text">
+            <span className="demo-badge">DEMO 预览</span>
+            <span>当前为浏览器本地模拟状态（零算力消耗），支持模拟出图、MOSS 坐标排版与 38 个公开工作流预览</span>
+          </div>
+          <div className="demo-banner-actions">
+            <button type="button" className="demo-banner-btn" onClick={handleResetDemo}>重置演示</button>
+            <a className="demo-banner-btn" href="https://github.com/TizenryA/drawing-studio-release" target="_blank" rel="noreferrer">GitHub 仓库</a>
+          </div>
+        </div>
+      )}
       <main className={`page page-${page}`}>
         <header className="page-title">
           <div className="row" style={{ gap: '18px' }}>
