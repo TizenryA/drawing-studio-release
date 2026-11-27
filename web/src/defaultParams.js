@@ -1,0 +1,2 @@
+export const baseUpscale={enabled:false,mode:'off',scale:2,denoise:0.3,tile_size:512,model:'',workflow:'',width:'',height:''};
+export const defaultParams={mode:'txt2img',model:'',loras:[],controlnet:'',vae:'',prompt:'',negative_prompt:'',width:1024,height:1536,steps:28,cfg:5.5,seed:-1,sampler:'euler',scheduler:'normal',n:1,denoise:0.7,workflow:'',face_restore:false,input_image:'',mask:'',project:'',upscale:baseUpscale};

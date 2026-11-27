@@ -1,0 +1,396 @@
+{
+  "id": "h3-studio-hq20-mystic-v5",
+  "mode": "img2img",
+  "mapping": {
+    "prompt": "20.prompt",
+    "width": "20.width",
+    "height": "20.height",
+    "seed": "23.noise_seed",
+    "steps": "22.steps",
+    "sampler": "21.sampler_name",
+    "scheduler": "22.scheduler",
+    "image": "1.image",
+    "ref_image_size": "20.ref_image_size",
+    "video_vae": "13.vae_name"
+  },
+  "model_fields": {
+    "video_vae": "vae"
+  },
+  "name": "H3 [BF16] 参考图 · 20步无Turbo高画质 · 无缝VAE · Mystic v5",
+  "workflow": {
+    "1": {
+      "class_type": "LoadImage",
+      "inputs": {
+        "image": "input_ref_1.jpg"
+      }
+    },
+    "10": {
+      "class_type": "UNETLoader",
+      "inputs": {
+        "unet_name": "minimax_h3_ref2va_bf16.safetensors",
+        "weight_dtype": "default"
+      }
+    },
+    "12": {
+      "class_type": "CLIPLoader",
+      "inputs": {
+        "clip_name": "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+        "type": "minimax",
+        "device": "default"
+      }
+    },
+    "14": {
+      "class_type": "VAELoader",
+      "inputs": {
+        "vae_name": "minimax_h3_audio_vae_fp32.safetensors"
+      }
+    },
+    "13": {
+      "class_type": "VAELoader",
+      "inputs": {
+        "vae_name": "minimax_h3_video_vae_dully_seamless_v1_int8convrot.safetensors"
+      }
+    },
+    "20": {
+      "class_type": "MiniMaxH3ReferenceToVideo",
+      "inputs": {
+        "clip": [
+          "12",
+          0
+        ],
+        "vae": [
+          "13",
+          0
+        ],
+        "audio_vae": [
+          "14",
+          0
+        ],
+        "prompt": "<Picture 1> smiles softly and turns toward the camera, hair moving in a light breeze, steady slow camera push.\nAudio: gentle ambient wind, no dialogue.",
+        "width": 544,
+        "height": 960,
+        "length": 124,
+        "ref_image_size": "match",
+        "ref_images.ref_image_0": [
+          "1",
+          0
+        ]
+      }
+    },
+    "22": {
+      "class_type": "BasicScheduler",
+      "inputs": {
+        "model": [
+          "40",
+          0
+        ],
+        "scheduler": "simple",
+        "steps": 20,
+        "denoise": 1.0
+      }
+    },
+    "40": {
+      "class_type": "LoraLoaderModelOnly",
+      "inputs": {
+        "model": [
+          "10",
+          0
+        ],
+        "lora_name": "MysticXXX_MMH3-V5-ref2va.safetensors",
+        "strength_model": 0.8
+      }
+    },
+    "21": {
+      "class_type": "KSamplerSelect",
+      "inputs": {
+        "sampler_name": "res_multistep"
+      }
+    },
+    "24": {
+      "class_type": "BasicGuider",
+      "inputs": {
+        "model": [
+          "40",
+          0
+        ],
+        "conditioning": [
+          "20",
+          0
+        ]
+      }
+    },
+    "23": {
+      "class_type": "RandomNoise",
+      "inputs": {
+        "noise_seed": 1
+      }
+    },
+    "25": {
+      "class_type": "SamplerCustomAdvanced",
+      "inputs": {
+        "noise": [
+          "23",
+          0
+        ],
+        "guider": [
+          "24",
+          0
+        ],
+        "sampler": [
+          "21",
+          0
+        ],
+        "sigmas": [
+          "22",
+          0
+        ],
+        "latent_image": [
+          "20",
+          1
+        ]
+      }
+    },
+    "26": {
+      "class_type": "VAEDecode",
+      "inputs": {
+        "samples": [
+          "25",
+          0
+        ],
+        "vae": [
+          "13",
+          0
+        ]
+      }
+    },
+    "27": {
+      "class_type": "VAEDecodeAudio",
+      "inputs": {
+        "samples": [
+          "25",
+          0
+        ],
+        "vae": [
+          "14",
+          0
+        ]
+      }
+    },
+    "28": {
+      "class_type": "CreateVideo",
+      "inputs": {
+        "images": [
+          "26",
+          0
+        ],
+        "fps": 24.0,
+        "audio": [
+          "27",
+          0
+        ]
+      }
+    },
+    "29": {
+      "class_type": "SaveVideo",
+      "inputs": {
+        "video": [
+          "28",
+          0
+        ],
+        "filename_prefix": "video/MiniMax_H3",
+        "format": "auto",
+        "format.codec": "auto"
+      }
+    }
+  },
+  "import_notes": "studio「高质量 20步」：不挂 Turbo、不做 SigmaShift，底模 → Mystic V5 @0.8，res_multistep/simple 20 步；无缝 VAE。默认 544×960，124 帧。耗时约为 8 步的 2 倍多。来源：colab-gpu-studio minimax-h3-ref2v 1.4.0（ac29d3d8）同构移植；底模换成 Draw 已有的全量 REF2VA BF16（studio 为 L4 用 pruned int8）。",
+  "source_workflow": {
+    "1": {
+      "class_type": "LoadImage",
+      "inputs": {
+        "image": "input_ref_1.jpg"
+      }
+    },
+    "10": {
+      "class_type": "UNETLoader",
+      "inputs": {
+        "unet_name": "minimax_h3_ref2va_bf16.safetensors",
+        "weight_dtype": "default"
+      }
+    },
+    "12": {
+      "class_type": "CLIPLoader",
+      "inputs": {
+        "clip_name": "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+        "type": "minimax",
+        "device": "default"
+      }
+    },
+    "14": {
+      "class_type": "VAELoader",
+      "inputs": {
+        "vae_name": "minimax_h3_audio_vae_fp32.safetensors"
+      }
+    },
+    "13": {
+      "class_type": "VAELoader",
+      "inputs": {
+        "vae_name": "minimax_h3_video_vae_dully_seamless_v1_int8convrot.safetensors"
+      }
+    },
+    "20": {
+      "class_type": "MiniMaxH3ReferenceToVideo",
+      "inputs": {
+        "clip": [
+          "12",
+          0
+        ],
+        "vae": [
+          "13",
+          0
+        ],
+        "audio_vae": [
+          "14",
+          0
+        ],
+        "prompt": "<Picture 1> smiles softly and turns toward the camera, hair moving in a light breeze, steady slow camera push.\nAudio: gentle ambient wind, no dialogue.",
+        "width": 544,
+        "height": 960,
+        "length": 124,
+        "ref_image_size": "match",
+        "ref_images.ref_image_0": [
+          "1",
+          0
+        ]
+      }
+    },
+    "22": {
+      "class_type": "BasicScheduler",
+      "inputs": {
+        "model": [
+          "40",
+          0
+        ],
+        "scheduler": "simple",
+        "steps": 20,
+        "denoise": 1.0
+      }
+    },
+    "40": {
+      "class_type": "LoraLoaderModelOnly",
+      "inputs": {
+        "model": [
+          "10",
+          0
+        ],
+        "lora_name": "MysticXXX_MMH3-V5-ref2va.safetensors",
+        "strength_model": 0.8
+      }
+    },
+    "21": {
+      "class_type": "KSamplerSelect",
+      "inputs": {
+        "sampler_name": "res_multistep"
+      }
+    },
+    "24": {
+      "class_type": "BasicGuider",
+      "inputs": {
+        "model": [
+          "40",
+          0
+        ],
+        "conditioning": [
+          "20",
+          0
+        ]
+      }
+    },
+    "23": {
+      "class_type": "RandomNoise",
+      "inputs": {
+        "noise_seed": 1
+      }
+    },
+    "25": {
+      "class_type": "SamplerCustomAdvanced",
+      "inputs": {
+        "noise": [
+          "23",
+          0
+        ],
+        "guider": [
+          "24",
+          0
+        ],
+        "sampler": [
+          "21",
+          0
+        ],
+        "sigmas": [
+          "22",
+          0
+        ],
+        "latent_image": [
+          "20",
+          1
+        ]
+      }
+    },
+    "26": {
+      "class_type": "VAEDecode",
+      "inputs": {
+        "samples": [
+          "25",
+          0
+        ],
+        "vae": [
+          "13",
+          0
+        ]
+      }
+    },
+    "27": {
+      "class_type": "VAEDecodeAudio",
+      "inputs": {
+        "samples": [
+          "25",
+          0
+        ],
+        "vae": [
+          "14",
+          0
+        ]
+      }
+    },
+    "28": {
+      "class_type": "CreateVideo",
+      "inputs": {
+        "images": [
+          "26",
+          0
+        ],
+        "fps": 24.0,
+        "audio": [
+          "27",
+          0
+        ]
+      }
+    },
+    "29": {
+      "class_type": "SaveVideo",
+      "inputs": {
+        "video": [
+          "28",
+          0
+        ],
+        "filename_prefix": "video/MiniMax_H3",
+        "format": "auto",
+        "format.codec": "auto"
+      }
+    }
+  },
+  "builtin": false,
+  "version": 1,
+  "updated_at": "2026-11-16T13:34:33.066820+00:00"
+}

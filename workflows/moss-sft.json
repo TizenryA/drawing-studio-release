@@ -1,0 +1,338 @@
+{
+  "id": "moss-sft",
+  "name": "MOSS Image SFT (INT8)",
+  "mode": "api",
+  "workflow": {
+    "1": {
+      "class_type": "UNETLoader",
+      "inputs": {
+        "unet_name": "moss_image_sft_int8_convrot.safetensors",
+        "weight_dtype": "default"
+      },
+      "_meta": {
+        "title": "MOSS SFT UNET (int8)"
+      }
+    },
+    "2": {
+      "class_type": "ModelSamplingAuraFlow",
+      "inputs": {
+        "shift": 3.5,
+        "sampling": "flow",
+        "model": [
+          "1",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "MOSS SFT 流调度 (AuraFlow Shift)"
+      }
+    },
+    "4": {
+      "class_type": "CLIPLoader",
+      "inputs": {
+        "clip_name": "qwen3.5_9b_int8_convrot.safetensors",
+        "type": "moss_image",
+        "device": "default"
+      },
+      "_meta": {
+        "title": "MOSS Qwen 3.5 9B CLIP"
+      }
+    },
+    "5": {
+      "class_type": "VAELoader",
+      "inputs": {
+        "vae_name": "flux2-vae.safetensors"
+      },
+      "_meta": {
+        "title": "Flux2 / MOSS VAE"
+      }
+    },
+    "6": {
+      "class_type": "CLIPTextEncode",
+      "inputs": {
+        "text": "1girl, ink wash and painterly anime illustration, dynamic pose, clean hands, cinematic lighting, masterpiece",
+        "clip": [
+          "4",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "正向提示词"
+      }
+    },
+    "7": {
+      "class_type": "CLIPTextEncode",
+      "inputs": {
+        "text": "lowres, blurry, bad anatomy, extra fingers, mutated hands, missing limbs, watermark, text",
+        "clip": [
+          "4",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "反向提示词"
+      }
+    },
+    "8": {
+      "class_type": "EmptyFlux2LatentImage",
+      "inputs": {
+        "width": 832,
+        "height": 1248,
+        "batch_size": 1
+      },
+      "_meta": {
+        "title": "MOSS SFT 空 Latent"
+      }
+    },
+    "9": {
+      "class_type": "KSampler",
+      "inputs": {
+        "seed": 999,
+        "steps": 28,
+        "cfg": 3.5,
+        "sampler_name": "er_sde",
+        "scheduler": "simple",
+        "denoise": 1.0,
+        "model": [
+          "2",
+          0
+        ],
+        "positive": [
+          "6",
+          0
+        ],
+        "negative": [
+          "7",
+          0
+        ],
+        "latent_image": [
+          "8",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "KSampler (SFT)"
+      }
+    },
+    "10": {
+      "class_type": "VAEDecode",
+      "inputs": {
+        "samples": [
+          "9",
+          0
+        ],
+        "vae": [
+          "5",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "VAE 解码"
+      }
+    },
+    "11": {
+      "class_type": "SaveImage",
+      "inputs": {
+        "filename_prefix": "MOSS_SFT",
+        "images": [
+          "10",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "保存图像"
+      }
+    }
+  },
+  "mapping": {
+    "prompt": {
+      "node": "6",
+      "input": "text"
+    },
+    "negative_prompt": {
+      "node": "7",
+      "input": "text"
+    },
+    "seed": {
+      "node": "9",
+      "input": "seed"
+    },
+    "steps": {
+      "node": "9",
+      "input": "steps"
+    },
+    "cfg": {
+      "node": "9",
+      "input": "cfg"
+    },
+    "sampler": {
+      "node": "9",
+      "input": "sampler_name"
+    },
+    "scheduler": {
+      "node": "9",
+      "input": "scheduler"
+    },
+    "shift": {
+      "node": "2",
+      "input": "shift"
+    },
+    "width": {
+      "node": "8",
+      "input": "width"
+    },
+    "height": {
+      "node": "8",
+      "input": "height"
+    },
+    "batch_size": {
+      "node": "8",
+      "input": "batch_size"
+    }
+  },
+  "import_notes": "MOSS Image SFT (INT8) 通用配置：默认 Shift 3.5（推荐 3.2~3.8）、Steps 28（推荐 26~32）、CFG 3.5（推荐 3.2~3.8）、er_sde / simple。四肢解剖、手势与多格漫画分镜及坐标排版远比 Base 稳；可在面板自由叠加公开 LoRA，切回 MOSS Image Base (BF16)（moss-base）时请勿沿用 SFT 的低 Shift/低步数。",
+  "source_workflow": {
+    "1": {
+      "class_type": "UNETLoader",
+      "inputs": {
+        "unet_name": "moss_image_sft_int8_convrot.safetensors",
+        "weight_dtype": "default"
+      },
+      "_meta": {
+        "title": "MOSS SFT UNET (int8)"
+      }
+    },
+    "2": {
+      "class_type": "ModelSamplingAuraFlow",
+      "inputs": {
+        "shift": 3.5,
+        "sampling": "flow",
+        "model": [
+          "1",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "MOSS SFT 流调度 (AuraFlow Shift)"
+      }
+    },
+    "4": {
+      "class_type": "CLIPLoader",
+      "inputs": {
+        "clip_name": "qwen3.5_9b_int8_convrot.safetensors",
+        "type": "moss_image",
+        "device": "default"
+      },
+      "_meta": {
+        "title": "MOSS Qwen 3.5 9B CLIP"
+      }
+    },
+    "5": {
+      "class_type": "VAELoader",
+      "inputs": {
+        "vae_name": "flux2-vae.safetensors"
+      },
+      "_meta": {
+        "title": "Flux2 / MOSS VAE"
+      }
+    },
+    "6": {
+      "class_type": "CLIPTextEncode",
+      "inputs": {
+        "text": "1girl, ink wash and painterly anime illustration, dynamic pose, clean hands, cinematic lighting, masterpiece",
+        "clip": [
+          "4",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "正向提示词"
+      }
+    },
+    "7": {
+      "class_type": "CLIPTextEncode",
+      "inputs": {
+        "text": "lowres, blurry, bad anatomy, extra fingers, mutated hands, missing limbs, watermark, text",
+        "clip": [
+          "4",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "反向提示词"
+      }
+    },
+    "8": {
+      "class_type": "EmptyFlux2LatentImage",
+      "inputs": {
+        "width": 832,
+        "height": 1248,
+        "batch_size": 1
+      },
+      "_meta": {
+        "title": "MOSS SFT 空 Latent"
+      }
+    },
+    "9": {
+      "class_type": "KSampler",
+      "inputs": {
+        "seed": 999,
+        "steps": 28,
+        "cfg": 3.5,
+        "sampler_name": "er_sde",
+        "scheduler": "simple",
+        "denoise": 1.0,
+        "model": [
+          "2",
+          0
+        ],
+        "positive": [
+          "6",
+          0
+        ],
+        "negative": [
+          "7",
+          0
+        ],
+        "latent_image": [
+          "8",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "KSampler (SFT)"
+      }
+    },
+    "10": {
+      "class_type": "VAEDecode",
+      "inputs": {
+        "samples": [
+          "9",
+          0
+        ],
+        "vae": [
+          "5",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "VAE 解码"
+      }
+    },
+    "11": {
+      "class_type": "SaveImage",
+      "inputs": {
+        "filename_prefix": "MOSS_SFT",
+        "images": [
+          "10",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "保存图像"
+      }
+    }
+  },
+  "builtin": false,
+  "version": 1
+}

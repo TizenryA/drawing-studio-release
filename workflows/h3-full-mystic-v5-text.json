@@ -1,0 +1,416 @@
+{
+  "id": "h3-full-mystic-v5-text",
+  "name": "H3 [BF16] 文生视频 · 8步加速(Shift12) · 官方FP16 VAE · Mystic v5",
+  "mode": "custom",
+  "workflow": {
+    "1": {
+      "class_type": "UNETLoader",
+      "inputs": {
+        "unet_name": "minimax_h3_ref2va_bf16.safetensors",
+        "weight_dtype": "default"
+      }
+    },
+    "2": {
+      "class_type": "CLIPLoader",
+      "inputs": {
+        "clip_name": "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+        "type": "minimax",
+        "device": "default"
+      }
+    },
+    "3": {
+      "class_type": "VAELoader",
+      "inputs": {
+        "vae_name": "minimax_h3_video_vae_fp16.safetensors"
+      }
+    },
+    "4": {
+      "class_type": "VAELoader",
+      "inputs": {
+        "vae_name": "minimax_h3_audio_vae_fp32.safetensors"
+      }
+    },
+    "5": {
+      "class_type": "LoraLoaderModelOnly",
+      "inputs": {
+        "model": [
+          "1",
+          0
+        ],
+        "lora_name": "minimax_h3_ref2v_turbo_8step_v1.1_768p_comfyui_bf16.safetensors",
+        "strength_model": 1.0
+      }
+    },
+    "6": {
+      "class_type": "LoraLoaderModelOnly",
+      "inputs": {
+        "model": [
+          "5",
+          0
+        ],
+        "lora_name": "MysticXXX_MMH3-V5-ref2va.safetensors",
+        "strength_model": 0.8
+      }
+    },
+    "7": {
+      "class_type": "MiniMaxH3SigmaShift",
+      "inputs": {
+        "model": [
+          "6",
+          0
+        ],
+        "shift_video": 12.0,
+        "shift_audio": 3.0
+      }
+    },
+    "8": {
+      "class_type": "MiniMaxH3ReferenceToVideo",
+      "inputs": {
+        "clip": [
+          "2",
+          0
+        ],
+        "vae": [
+          "3",
+          0
+        ],
+        "audio_vae": [
+          "4",
+          0
+        ],
+        "prompt": "integrated_multimodal_description: [Shot 1] A fully clothed adult woman in a white winter coat stands beside a quiet mountain lake. She gently turns her head toward the camera, wind moving her hair. Realistic cinematic lighting, natural skin detail, a steady slow camera push.\noverall_soundscape: Gentle wind and water ambience. No dialogue.\nnon_diegetic_music: N/A",
+        "width": 864,
+        "height": 480,
+        "length": 124,
+        "ref_image_size": "match"
+      }
+    },
+    "9": {
+      "class_type": "RandomNoise",
+      "inputs": {
+        "noise_seed": 20261113
+      }
+    },
+    "10": {
+      "class_type": "BasicGuider",
+      "inputs": {
+        "model": [
+          "7",
+          0
+        ],
+        "conditioning": [
+          "8",
+          0
+        ]
+      }
+    },
+    "11": {
+      "class_type": "KSamplerSelect",
+      "inputs": {
+        "sampler_name": "euler"
+      }
+    },
+    "12": {
+      "class_type": "BasicScheduler",
+      "inputs": {
+        "model": [
+          "7",
+          0
+        ],
+        "scheduler": "simple",
+        "steps": 8,
+        "denoise": 1.0
+      }
+    },
+    "13": {
+      "class_type": "SamplerCustomAdvanced",
+      "inputs": {
+        "noise": [
+          "9",
+          0
+        ],
+        "guider": [
+          "10",
+          0
+        ],
+        "sampler": [
+          "11",
+          0
+        ],
+        "sigmas": [
+          "12",
+          0
+        ],
+        "latent_image": [
+          "8",
+          1
+        ]
+      }
+    },
+    "14": {
+      "class_type": "VAEDecode",
+      "inputs": {
+        "samples": [
+          "13",
+          0
+        ],
+        "vae": [
+          "3",
+          0
+        ]
+      }
+    },
+    "15": {
+      "class_type": "VAEDecodeAudio",
+      "inputs": {
+        "samples": [
+          "13",
+          0
+        ],
+        "vae": [
+          "4",
+          0
+        ]
+      }
+    },
+    "16": {
+      "class_type": "CreateVideo",
+      "inputs": {
+        "images": [
+          "14",
+          0
+        ],
+        "audio": [
+          "15",
+          0
+        ],
+        "fps": 24.0,
+        "bit_depth": 8
+      }
+    },
+    "17": {
+      "class_type": "SaveVideo",
+      "inputs": {
+        "video": [
+          "16",
+          0
+        ],
+        "filename_prefix": "video/Draw_H3_Full_MysticV5",
+        "format": "mp4",
+        "format.codec": "h264"
+      }
+    }
+  },
+  "mapping": {
+    "prompt": "8.prompt",
+    "width": "8.width",
+    "height": "8.height",
+    "seed": "9.noise_seed",
+    "steps": "12.steps",
+    "sampler": "11.sampler_name",
+    "scheduler": "12.scheduler"
+  },
+  "import_notes": "全量未裁剪 REF2VA BF16；LightX2V REF Turbo 8-step v1.1 @1.0 → Mystic V5 REF2VA @0.8。24fps，124帧约5.17秒，864×480。需要参考图时选参考图入口。帧数与LoRA强度可在模型页工作流编辑器修改。来源：Comfy-Org/MiniMax-H3、lightx2v/Minimax-h3-Turbo、Civitai 2856467 v3416478。",
+  "source_workflow": {
+    "1": {
+      "class_type": "UNETLoader",
+      "inputs": {
+        "unet_name": "minimax_h3_ref2va_bf16.safetensors",
+        "weight_dtype": "default"
+      }
+    },
+    "2": {
+      "class_type": "CLIPLoader",
+      "inputs": {
+        "clip_name": "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+        "type": "minimax",
+        "device": "default"
+      }
+    },
+    "3": {
+      "class_type": "VAELoader",
+      "inputs": {
+        "vae_name": "minimax_h3_video_vae_fp16.safetensors"
+      }
+    },
+    "4": {
+      "class_type": "VAELoader",
+      "inputs": {
+        "vae_name": "minimax_h3_audio_vae_fp32.safetensors"
+      }
+    },
+    "5": {
+      "class_type": "LoraLoaderModelOnly",
+      "inputs": {
+        "model": [
+          "1",
+          0
+        ],
+        "lora_name": "minimax_h3_ref2v_turbo_8step_v1.1_768p_comfyui_bf16.safetensors",
+        "strength_model": 1.0
+      }
+    },
+    "6": {
+      "class_type": "LoraLoaderModelOnly",
+      "inputs": {
+        "model": [
+          "5",
+          0
+        ],
+        "lora_name": "MysticXXX_MMH3-V5-ref2va.safetensors",
+        "strength_model": 0.8
+      }
+    },
+    "7": {
+      "class_type": "MiniMaxH3SigmaShift",
+      "inputs": {
+        "model": [
+          "6",
+          0
+        ],
+        "shift_video": 12.0,
+        "shift_audio": 3.0
+      }
+    },
+    "8": {
+      "class_type": "MiniMaxH3ReferenceToVideo",
+      "inputs": {
+        "clip": [
+          "2",
+          0
+        ],
+        "vae": [
+          "3",
+          0
+        ],
+        "audio_vae": [
+          "4",
+          0
+        ],
+        "prompt": "integrated_multimodal_description: [Shot 1] A fully clothed adult woman in a white winter coat stands beside a quiet mountain lake. She gently turns her head toward the camera, wind moving her hair. Realistic cinematic lighting, natural skin detail, a steady slow camera push.\noverall_soundscape: Gentle wind and water ambience. No dialogue.\nnon_diegetic_music: N/A",
+        "width": 864,
+        "height": 480,
+        "length": 124,
+        "ref_image_size": "match"
+      }
+    },
+    "9": {
+      "class_type": "RandomNoise",
+      "inputs": {
+        "noise_seed": 20261113
+      }
+    },
+    "10": {
+      "class_type": "BasicGuider",
+      "inputs": {
+        "model": [
+          "7",
+          0
+        ],
+        "conditioning": [
+          "8",
+          0
+        ]
+      }
+    },
+    "11": {
+      "class_type": "KSamplerSelect",
+      "inputs": {
+        "sampler_name": "euler"
+      }
+    },
+    "12": {
+      "class_type": "BasicScheduler",
+      "inputs": {
+        "model": [
+          "7",
+          0
+        ],
+        "scheduler": "simple",
+        "steps": 8,
+        "denoise": 1.0
+      }
+    },
+    "13": {
+      "class_type": "SamplerCustomAdvanced",
+      "inputs": {
+        "noise": [
+          "9",
+          0
+        ],
+        "guider": [
+          "10",
+          0
+        ],
+        "sampler": [
+          "11",
+          0
+        ],
+        "sigmas": [
+          "12",
+          0
+        ],
+        "latent_image": [
+          "8",
+          1
+        ]
+      }
+    },
+    "14": {
+      "class_type": "VAEDecode",
+      "inputs": {
+        "samples": [
+          "13",
+          0
+        ],
+        "vae": [
+          "3",
+          0
+        ]
+      }
+    },
+    "15": {
+      "class_type": "VAEDecodeAudio",
+      "inputs": {
+        "samples": [
+          "13",
+          0
+        ],
+        "vae": [
+          "4",
+          0
+        ]
+      }
+    },
+    "16": {
+      "class_type": "CreateVideo",
+      "inputs": {
+        "images": [
+          "14",
+          0
+        ],
+        "audio": [
+          "15",
+          0
+        ],
+        "fps": 24.0,
+        "bit_depth": 8
+      }
+    },
+    "17": {
+      "class_type": "SaveVideo",
+      "inputs": {
+        "video": [
+          "16",
+          0
+        ],
+        "filename_prefix": "video/Draw_H3_Full_MysticV5",
+        "format": "mp4",
+        "format.codec": "h264"
+      }
+    }
+  },
+  "builtin": false,
+  "version": 1,
+  "updated_at": "2026-11-13T13:57:53.580810+00:00"
+}

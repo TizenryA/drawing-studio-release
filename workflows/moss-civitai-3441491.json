@@ -1,0 +1,361 @@
+{
+  "mode": "api",
+  "workflow": {
+    "1": {
+      "class_type": "UNETLoader",
+      "inputs": {
+        "unet_name": "moss_image_base_bf16.safetensors",
+        "weight_dtype": "default"
+      },
+      "_meta": {
+        "title": "MOSS Base UNET (bf16)"
+      }
+    },
+    "2": {
+      "class_type": "ModelSamplingAuraFlow",
+      "inputs": {
+        "shift": 5.0,
+        "model": [
+          "1",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "MOSS 流调度 (Shift 5.0)"
+      }
+    },
+    "3": {
+      "class_type": "LoraLoaderModelOnly",
+      "inputs": {
+        "lora_name": "moss_blender3d_v2.safetensors",
+        "strength_model": 1.0,
+        "model": [
+          "2",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "MOSS Blender 3D 渲染 V2"
+      }
+    },
+    "4": {
+      "class_type": "CLIPLoader",
+      "inputs": {
+        "clip_name": "qwen3.5_9b_int8_convrot.safetensors",
+        "type": "moss_image",
+        "device": "default"
+      },
+      "_meta": {
+        "title": "MOSS Qwen 3.5 9B CLIP"
+      }
+    },
+    "5": {
+      "class_type": "VAELoader",
+      "inputs": {
+        "vae_name": "flux2-vae.safetensors"
+      },
+      "_meta": {
+        "title": "Flux2 / MOSS VAE"
+      }
+    },
+    "6": {
+      "class_type": "CLIPTextEncode",
+      "inputs": {
+        "text": "@blender, A fully clothed adult woman with long silver hair and blue eyes, wearing a tailored navy coat and white shirt, standing on a futuristic railway station platform, smooth polished 3D character rendering, realistic cloth and metal reflections, soft cinematic lighting, medium portrait.",
+        "clip": [
+          "4",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "正向提示词"
+      }
+    },
+    "7": {
+      "class_type": "CLIPTextEncode",
+      "inputs": {
+        "text": "lowres, blurry, bad anatomy, extra fingers, extra limbs, watermark, text, logo",
+        "clip": [
+          "4",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "反向提示词"
+      }
+    },
+    "8": {
+      "class_type": "EmptyFlux2LatentImage",
+      "inputs": {
+        "width": 768,
+        "height": 1024,
+        "batch_size": 1
+      },
+      "_meta": {
+        "title": "MOSS 空 Latent"
+      }
+    },
+    "9": {
+      "class_type": "KSampler",
+      "inputs": {
+        "seed": 20261113,
+        "steps": 28,
+        "cfg": 3.2,
+        "sampler_name": "euler",
+        "scheduler": "simple",
+        "denoise": 1.0,
+        "model": [
+          "3",
+          0
+        ],
+        "positive": [
+          "6",
+          0
+        ],
+        "negative": [
+          "7",
+          0
+        ],
+        "latent_image": [
+          "8",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "KSampler (Euler / Simple)"
+      }
+    },
+    "10": {
+      "class_type": "VAEDecode",
+      "inputs": {
+        "samples": [
+          "9",
+          0
+        ],
+        "vae": [
+          "5",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "VAE 解码"
+      }
+    },
+    "11": {
+      "class_type": "SaveImage",
+      "inputs": {
+        "filename_prefix": "MOSS_Civitai_3441491",
+        "images": [
+          "10",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "保存图像"
+      }
+    }
+  },
+  "mapping": {
+    "prompt": {
+      "node": "6",
+      "input": "text"
+    },
+    "negative_prompt": {
+      "node": "7",
+      "input": "text"
+    },
+    "seed": {
+      "node": "9",
+      "input": "seed"
+    },
+    "steps": {
+      "node": "9",
+      "input": "steps"
+    },
+    "cfg": {
+      "node": "9",
+      "input": "cfg"
+    },
+    "sampler": {
+      "node": "9",
+      "input": "sampler_name"
+    },
+    "scheduler": {
+      "node": "9",
+      "input": "scheduler"
+    },
+    "width": {
+      "node": "8",
+      "input": "width"
+    },
+    "height": {
+      "node": "8",
+      "input": "height"
+    },
+    "batch_size": {
+      "node": "8",
+      "input": "batch_size"
+    }
+  },
+  "id": "moss-civitai-3441491",
+  "name": "MOSS Blender 3D 渲染 V2",
+  "import_notes": "Civitai MOSS LoRA；单款配置。https://civitai.com/models/3028260",
+  "source_workflow": {
+    "1": {
+      "class_type": "UNETLoader",
+      "inputs": {
+        "unet_name": "moss_image_base_bf16.safetensors",
+        "weight_dtype": "default"
+      },
+      "_meta": {
+        "title": "MOSS Base UNET (bf16)"
+      }
+    },
+    "2": {
+      "class_type": "ModelSamplingAuraFlow",
+      "inputs": {
+        "shift": 5.0,
+        "model": [
+          "1",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "MOSS 流调度 (Shift 5.0)"
+      }
+    },
+    "3": {
+      "class_type": "LoraLoaderModelOnly",
+      "inputs": {
+        "lora_name": "moss_blender3d_v2.safetensors",
+        "strength_model": 1.0,
+        "model": [
+          "2",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "MOSS Blender 3D 渲染 V2"
+      }
+    },
+    "4": {
+      "class_type": "CLIPLoader",
+      "inputs": {
+        "clip_name": "qwen3.5_9b_int8_convrot.safetensors",
+        "type": "moss_image",
+        "device": "default"
+      },
+      "_meta": {
+        "title": "MOSS Qwen 3.5 9B CLIP"
+      }
+    },
+    "5": {
+      "class_type": "VAELoader",
+      "inputs": {
+        "vae_name": "flux2-vae.safetensors"
+      },
+      "_meta": {
+        "title": "Flux2 / MOSS VAE"
+      }
+    },
+    "6": {
+      "class_type": "CLIPTextEncode",
+      "inputs": {
+        "text": "@blender, A fully clothed adult woman with long silver hair and blue eyes, wearing a tailored navy coat and white shirt, standing on a futuristic railway station platform, smooth polished 3D character rendering, realistic cloth and metal reflections, soft cinematic lighting, medium portrait.",
+        "clip": [
+          "4",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "正向提示词"
+      }
+    },
+    "7": {
+      "class_type": "CLIPTextEncode",
+      "inputs": {
+        "text": "lowres, blurry, bad anatomy, extra fingers, extra limbs, watermark, text, logo",
+        "clip": [
+          "4",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "反向提示词"
+      }
+    },
+    "8": {
+      "class_type": "EmptyFlux2LatentImage",
+      "inputs": {
+        "width": 768,
+        "height": 1024,
+        "batch_size": 1
+      },
+      "_meta": {
+        "title": "MOSS 空 Latent"
+      }
+    },
+    "9": {
+      "class_type": "KSampler",
+      "inputs": {
+        "seed": 20261113,
+        "steps": 28,
+        "cfg": 3.2,
+        "sampler_name": "euler",
+        "scheduler": "simple",
+        "denoise": 1.0,
+        "model": [
+          "3",
+          0
+        ],
+        "positive": [
+          "6",
+          0
+        ],
+        "negative": [
+          "7",
+          0
+        ],
+        "latent_image": [
+          "8",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "KSampler (Euler / Simple)"
+      }
+    },
+    "10": {
+      "class_type": "VAEDecode",
+      "inputs": {
+        "samples": [
+          "9",
+          0
+        ],
+        "vae": [
+          "5",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "VAE 解码"
+      }
+    },
+    "11": {
+      "class_type": "SaveImage",
+      "inputs": {
+        "filename_prefix": "MOSS_Civitai_3441491",
+        "images": [
+          "10",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "保存图像"
+      }
+    }
+  },
+  "builtin": false,
+  "version": 1,
+  "updated_at": "2026-11-13T11:55:43.928802+00:00"
+}

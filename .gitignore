@@ -1,0 +1,12 @@
+data/
+config/*.json
+config/private/
+.env
+.env.*
+*.sqlite3*
+.venv/
+__pycache__/
+*.pyc
+web/node_modules/
+web/dist/
+artifacts/

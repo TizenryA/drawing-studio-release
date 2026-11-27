@@ -1,0 +1,501 @@
+{
+  "id": "pack-anima-seedvr2",
+  "name": "Anima + SeedVR2 精修",
+  "mode": "custom",
+  "workflow": {
+    "2": {
+      "class_type": "UNETLoader",
+      "inputs": {
+        "unet_name": "animayume_v05.safetensors",
+        "weight_dtype": "default"
+      },
+      "_meta": {
+        "title": "ANIMA • AnimaYume v0.5"
+      }
+    },
+    "3": {
+      "class_type": "CLIPLoader",
+      "inputs": {
+        "clip_name": "qwen_3_06b_base.safetensors",
+        "type": "qwen_image",
+        "device": "default"
+      },
+      "_meta": {
+        "title": "ANIMA • Qwen 0.6B text encoder"
+      }
+    },
+    "4": {
+      "class_type": "VAELoader",
+      "inputs": {
+        "vae_name": "qwen_image_vae.safetensors"
+      },
+      "_meta": {
+        "title": "ANIMA • Qwen Image VAE"
+      }
+    },
+    "6": {
+      "class_type": "LoraLoader",
+      "inputs": {
+        "lora_name": "anima_hsr_cg.safetensors",
+        "strength_model": 0,
+        "strength_clip": 0,
+        "model": [
+          "2",
+          0
+        ],
+        "clip": [
+          "3",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "崩铁 CG / Anima（Civitai 2727585，默认关闭）"
+      }
+    },
+    "7": {
+      "class_type": "ModelSamplingAuraFlow",
+      "inputs": {
+        "shift": 3,
+        "model": [
+          "6",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "Anima sampling shift 3"
+      }
+    },
+    "8": {
+      "class_type": "CLIPTextEncode",
+      "inputs": {
+        "text": "1girl, march 7th (honkai: star rail), smiling, long pink hair, blue eyes, delicate lineart, elegant composition, cinematic soft lighting, beautiful scenery, detailed clothing, anime illustration, masterpiece, high quality",
+        "clip": [
+          "6",
+          1
+        ]
+      },
+      "_meta": {
+        "title": "正向提示词"
+      }
+    },
+    "9": {
+      "class_type": "CLIPTextEncode",
+      "inputs": {
+        "text": "worst quality, low quality, blurry, bad anatomy, bad hands, extra fingers, extra limbs, deformed face, text, watermark, logo",
+        "clip": [
+          "6",
+          1
+        ]
+      },
+      "_meta": {
+        "title": "负向提示词"
+      }
+    },
+    "10": {
+      "class_type": "EmptySD3LatentImage",
+      "inputs": {
+        "width": 832,
+        "height": 1216,
+        "batch_size": 1
+      },
+      "_meta": {
+        "title": "Anima 16ch / 832×1216"
+      }
+    },
+    "11": {
+      "class_type": "KSampler",
+      "inputs": {
+        "seed": 42,
+        "steps": 32,
+        "cfg": 4.5,
+        "sampler_name": "er_sde",
+        "scheduler": "sgm_uniform",
+        "denoise": 1,
+        "model": [
+          "7",
+          0
+        ],
+        "positive": [
+          "8",
+          0
+        ],
+        "negative": [
+          "9",
+          0
+        ],
+        "latent_image": [
+          "10",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "Anima • 32 steps • CFG 4.5"
+      }
+    },
+    "12": {
+      "class_type": "VAEDecode",
+      "inputs": {
+        "samples": [
+          "11",
+          0
+        ],
+        "vae": [
+          "4",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "Anima VAE 解码"
+      }
+    },
+    "13": {
+      "class_type": "SaveImage",
+      "inputs": {
+        "filename_prefix": "Studio/Anima_original",
+        "images": [
+          "12",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "保存原图（跳过修复也能用）"
+      }
+    },
+    "14": {
+      "class_type": "SeedVR2LoadDiTModel",
+      "inputs": {
+        "model": "seedvr2_ema_3b_fp8_e4m3fn.safetensors",
+        "device": "cuda:0",
+        "blocks_to_swap": 16,
+        "swap_io_components": true,
+        "offload_device": "cpu",
+        "cache_model": false,
+        "attention_mode": "sdpa"
+      },
+      "_meta": {
+        "title": "SeedVR2 / 3B FP8 (16-block offload)"
+      }
+    },
+    "15": {
+      "class_type": "SeedVR2LoadVAEModel",
+      "inputs": {
+        "model": "ema_vae_fp16.safetensors",
+        "device": "cuda:0",
+        "encode_tiled": true,
+        "encode_tile_size": 1024,
+        "encode_tile_overlap": 128,
+        "decode_tiled": true,
+        "decode_tile_size": 1024,
+        "decode_tile_overlap": 128,
+        "tile_debug": "false",
+        "offload_device": "none",
+        "cache_model": false
+      },
+      "_meta": {
+        "title": "SeedVR2 / VAE (tiled)"
+      }
+    },
+    "16": {
+      "class_type": "SeedVR2VideoUpscaler",
+      "inputs": {
+        "seed": 42,
+        "resolution": 1280,
+        "max_resolution": 0,
+        "batch_size": 1,
+        "uniform_batch_size": false,
+        "color_correction": "lab",
+        "temporal_overlap": 0,
+        "prepend_frames": 0,
+        "input_noise_scale": 0,
+        "latent_noise_scale": 0,
+        "offload_device": "cpu",
+        "enable_debug": false,
+        "image": [
+          "12",
+          0
+        ],
+        "dit": [
+          "14",
+          0
+        ],
+        "vae": [
+          "15",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "SeedVR2 / Image restore to short side 1280"
+      }
+    },
+    "17": {
+      "class_type": "SaveImage",
+      "inputs": {
+        "filename_prefix": "Studio/SeedVR2_restored",
+        "images": [
+          "16",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "保存修复图"
+      }
+    }
+  },
+  "mapping": {
+    "prompt": "8.text",
+    "negative_prompt": "9.text",
+    "seed": [
+      "11.seed",
+      "16.seed"
+    ],
+    "steps": "11.steps",
+    "cfg": "11.cfg",
+    "sampler": "11.sampler_name",
+    "scheduler": "11.scheduler",
+    "width": "10.width",
+    "height": "10.height",
+    "batch_size": "10.batch_size"
+  },
+  "import_notes": "Anima (AnimaYume v0.5) 出图后自动接 SeedVR2 3B FP8 单图精修至短边 1280；内含公开 Civitai 2727585 LoRA 槽位（anima_hsr_cg.safetensors，默认关闭，可在面板调高权重或叠挂其他公开 LoRA）。",
+  "source_workflow": {
+    "2": {
+      "class_type": "UNETLoader",
+      "inputs": {
+        "unet_name": "animayume_v05.safetensors",
+        "weight_dtype": "default"
+      },
+      "_meta": {
+        "title": "ANIMA • AnimaYume v0.5"
+      }
+    },
+    "3": {
+      "class_type": "CLIPLoader",
+      "inputs": {
+        "clip_name": "qwen_3_06b_base.safetensors",
+        "type": "qwen_image",
+        "device": "default"
+      },
+      "_meta": {
+        "title": "ANIMA • Qwen 0.6B text encoder"
+      }
+    },
+    "4": {
+      "class_type": "VAELoader",
+      "inputs": {
+        "vae_name": "qwen_image_vae.safetensors"
+      },
+      "_meta": {
+        "title": "ANIMA • Qwen Image VAE"
+      }
+    },
+    "6": {
+      "class_type": "LoraLoader",
+      "inputs": {
+        "lora_name": "anima_hsr_cg.safetensors",
+        "strength_model": 0,
+        "strength_clip": 0,
+        "model": [
+          "2",
+          0
+        ],
+        "clip": [
+          "3",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "崩铁 CG / Anima（Civitai 2727585，默认关闭）"
+      }
+    },
+    "7": {
+      "class_type": "ModelSamplingAuraFlow",
+      "inputs": {
+        "shift": 3,
+        "model": [
+          "6",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "Anima sampling shift 3"
+      }
+    },
+    "8": {
+      "class_type": "CLIPTextEncode",
+      "inputs": {
+        "text": "1girl, march 7th (honkai: star rail), smiling, long pink hair, blue eyes, delicate lineart, elegant composition, cinematic soft lighting, beautiful scenery, detailed clothing, anime illustration, masterpiece, high quality",
+        "clip": [
+          "6",
+          1
+        ]
+      },
+      "_meta": {
+        "title": "正向提示词"
+      }
+    },
+    "9": {
+      "class_type": "CLIPTextEncode",
+      "inputs": {
+        "text": "worst quality, low quality, blurry, bad anatomy, bad hands, extra fingers, extra limbs, deformed face, text, watermark, logo",
+        "clip": [
+          "6",
+          1
+        ]
+      },
+      "_meta": {
+        "title": "负向提示词"
+      }
+    },
+    "10": {
+      "class_type": "EmptySD3LatentImage",
+      "inputs": {
+        "width": 832,
+        "height": 1216,
+        "batch_size": 1
+      },
+      "_meta": {
+        "title": "Anima 16ch / 832×1216"
+      }
+    },
+    "11": {
+      "class_type": "KSampler",
+      "inputs": {
+        "seed": 42,
+        "steps": 32,
+        "cfg": 4.5,
+        "sampler_name": "er_sde",
+        "scheduler": "sgm_uniform",
+        "denoise": 1,
+        "model": [
+          "7",
+          0
+        ],
+        "positive": [
+          "8",
+          0
+        ],
+        "negative": [
+          "9",
+          0
+        ],
+        "latent_image": [
+          "10",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "Anima • 32 steps • CFG 4.5"
+      }
+    },
+    "12": {
+      "class_type": "VAEDecode",
+      "inputs": {
+        "samples": [
+          "11",
+          0
+        ],
+        "vae": [
+          "4",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "Anima VAE 解码"
+      }
+    },
+    "13": {
+      "class_type": "SaveImage",
+      "inputs": {
+        "filename_prefix": "Studio/Anima_original",
+        "images": [
+          "12",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "保存原图（跳过修复也能用）"
+      }
+    },
+    "14": {
+      "class_type": "SeedVR2LoadDiTModel",
+      "inputs": {
+        "model": "seedvr2_ema_3b_fp8_e4m3fn.safetensors",
+        "device": "cuda:0",
+        "blocks_to_swap": 16,
+        "swap_io_components": true,
+        "offload_device": "cpu",
+        "cache_model": false,
+        "attention_mode": "sdpa"
+      },
+      "_meta": {
+        "title": "SeedVR2 / 3B FP8 (16-block offload)"
+      }
+    },
+    "15": {
+      "class_type": "SeedVR2LoadVAEModel",
+      "inputs": {
+        "model": "ema_vae_fp16.safetensors",
+        "device": "cuda:0",
+        "encode_tiled": true,
+        "encode_tile_size": 1024,
+        "encode_tile_overlap": 128,
+        "decode_tiled": true,
+        "decode_tile_size": 1024,
+        "decode_tile_overlap": 128,
+        "tile_debug": "false",
+        "offload_device": "none",
+        "cache_model": false
+      },
+      "_meta": {
+        "title": "SeedVR2 / VAE (tiled)"
+      }
+    },
+    "16": {
+      "class_type": "SeedVR2VideoUpscaler",
+      "inputs": {
+        "seed": 42,
+        "resolution": 1280,
+        "max_resolution": 0,
+        "batch_size": 1,
+        "uniform_batch_size": false,
+        "color_correction": "lab",
+        "temporal_overlap": 0,
+        "prepend_frames": 0,
+        "input_noise_scale": 0,
+        "latent_noise_scale": 0,
+        "offload_device": "cpu",
+        "enable_debug": false,
+        "image": [
+          "12",
+          0
+        ],
+        "dit": [
+          "14",
+          0
+        ],
+        "vae": [
+          "15",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "SeedVR2 / Image restore to short side 1280"
+      }
+    },
+    "17": {
+      "class_type": "SaveImage",
+      "inputs": {
+        "filename_prefix": "Studio/SeedVR2_restored",
+        "images": [
+          "16",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "保存修复图"
+      }
+    }
+  },
+  "builtin": false,
+  "version": 1
+}

@@ -1,0 +1,395 @@
+{
+  "id": "pack-illustrious-seedvr2",
+  "name": "Illustrious + SeedVR2 精修",
+  "mode": "custom",
+  "workflow": {
+    "2": {
+      "class_type": "CheckpointLoaderSimple",
+      "inputs": {
+        "ckpt_name": "wai_illustrious_sdxl_v17.safetensors"
+      },
+      "_meta": {
+        "title": "Illustrious • WAI v17"
+      }
+    },
+    "4": {
+      "class_type": "CLIPTextEncode",
+      "inputs": {
+        "text": "1girl, march 7th (honkai: star rail), pink hair, blue eyes, beautiful detailed illustration, soft light, delicate brushwork, masterpiece, best quality, amazing quality, cinematic composition",
+        "clip": [
+          "2",
+          1
+        ]
+      },
+      "_meta": {
+        "title": "正向提示词"
+      }
+    },
+    "5": {
+      "class_type": "CLIPTextEncode",
+      "inputs": {
+        "text": "worst quality, bad quality, lowres, bad anatomy, extra fingers, fused hands, jpeg artifacts, text, watermark, logo",
+        "clip": [
+          "2",
+          1
+        ]
+      },
+      "_meta": {
+        "title": "负向提示词"
+      }
+    },
+    "6": {
+      "class_type": "EmptyLatentImage",
+      "inputs": {
+        "width": 832,
+        "height": 1216,
+        "batch_size": 1
+      },
+      "_meta": {
+        "title": "SDXL / 832×1216"
+      }
+    },
+    "7": {
+      "class_type": "KSampler",
+      "inputs": {
+        "seed": 42,
+        "steps": 28,
+        "cfg": 5.5,
+        "sampler_name": "euler_ancestral",
+        "scheduler": "normal",
+        "denoise": 1,
+        "model": [
+          "2",
+          0
+        ],
+        "positive": [
+          "4",
+          0
+        ],
+        "negative": [
+          "5",
+          0
+        ],
+        "latent_image": [
+          "6",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "Illustrious • 28 steps • CFG 5.5"
+      }
+    },
+    "8": {
+      "class_type": "VAEDecode",
+      "inputs": {
+        "samples": [
+          "7",
+          0
+        ],
+        "vae": [
+          "2",
+          2
+        ]
+      },
+      "_meta": {
+        "title": "SDXL VAE 解码"
+      }
+    },
+    "9": {
+      "class_type": "SaveImage",
+      "inputs": {
+        "filename_prefix": "Studio/Illustrious_original",
+        "images": [
+          "8",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "保存原图"
+      }
+    },
+    "10": {
+      "class_type": "SeedVR2LoadDiTModel",
+      "inputs": {
+        "model": "seedvr2_ema_3b_fp8_e4m3fn.safetensors",
+        "device": "cuda:0",
+        "blocks_to_swap": 16,
+        "swap_io_components": true,
+        "offload_device": "cpu",
+        "cache_model": false,
+        "attention_mode": "sdpa"
+      },
+      "_meta": {
+        "title": "SeedVR2 / 3B FP8 (16-block offload)"
+      }
+    },
+    "11": {
+      "class_type": "SeedVR2LoadVAEModel",
+      "inputs": {
+        "model": "ema_vae_fp16.safetensors",
+        "device": "cuda:0",
+        "encode_tiled": true,
+        "encode_tile_size": 1024,
+        "encode_tile_overlap": 128,
+        "decode_tiled": true,
+        "decode_tile_size": 1024,
+        "decode_tile_overlap": 128,
+        "tile_debug": "false",
+        "offload_device": "none",
+        "cache_model": false
+      },
+      "_meta": {
+        "title": "SeedVR2 / VAE (tiled)"
+      }
+    },
+    "12": {
+      "class_type": "SeedVR2VideoUpscaler",
+      "inputs": {
+        "seed": 42,
+        "resolution": 1280,
+        "max_resolution": 0,
+        "batch_size": 1,
+        "uniform_batch_size": false,
+        "color_correction": "lab",
+        "temporal_overlap": 0,
+        "prepend_frames": 0,
+        "input_noise_scale": 0,
+        "latent_noise_scale": 0,
+        "offload_device": "cpu",
+        "enable_debug": false,
+        "image": [
+          "8",
+          0
+        ],
+        "dit": [
+          "10",
+          0
+        ],
+        "vae": [
+          "11",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "SeedVR2 / Image restore to short side 1280"
+      }
+    },
+    "13": {
+      "class_type": "SaveImage",
+      "inputs": {
+        "filename_prefix": "Studio/SeedVR2_restored",
+        "images": [
+          "12",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "保存修复图"
+      }
+    }
+  },
+  "mapping": {
+    "prompt": "4.text",
+    "negative_prompt": "5.text",
+    "seed": [
+      "7.seed",
+      "12.seed"
+    ],
+    "steps": "7.steps",
+    "cfg": "7.cfg",
+    "sampler": "7.sampler_name",
+    "scheduler": "7.scheduler",
+    "width": "6.width",
+    "height": "6.height",
+    "batch_size": "6.batch_size"
+  },
+  "import_notes": "Illustrious (WAI Illustrious SDXL v17) 出图后自动接 SeedVR2 3B FP8 单图精修至短边 1280，可在绘图面板自由叠挂公开 Illustrious/SDXL LoRA。",
+  "source_workflow": {
+    "2": {
+      "class_type": "CheckpointLoaderSimple",
+      "inputs": {
+        "ckpt_name": "wai_illustrious_sdxl_v17.safetensors"
+      },
+      "_meta": {
+        "title": "Illustrious • WAI v17"
+      }
+    },
+    "4": {
+      "class_type": "CLIPTextEncode",
+      "inputs": {
+        "text": "1girl, march 7th (honkai: star rail), pink hair, blue eyes, beautiful detailed illustration, soft light, delicate brushwork, masterpiece, best quality, amazing quality, cinematic composition",
+        "clip": [
+          "2",
+          1
+        ]
+      },
+      "_meta": {
+        "title": "正向提示词"
+      }
+    },
+    "5": {
+      "class_type": "CLIPTextEncode",
+      "inputs": {
+        "text": "worst quality, bad quality, lowres, bad anatomy, extra fingers, fused hands, jpeg artifacts, text, watermark, logo",
+        "clip": [
+          "2",
+          1
+        ]
+      },
+      "_meta": {
+        "title": "负向提示词"
+      }
+    },
+    "6": {
+      "class_type": "EmptyLatentImage",
+      "inputs": {
+        "width": 832,
+        "height": 1216,
+        "batch_size": 1
+      },
+      "_meta": {
+        "title": "SDXL / 832×1216"
+      }
+    },
+    "7": {
+      "class_type": "KSampler",
+      "inputs": {
+        "seed": 42,
+        "steps": 28,
+        "cfg": 5.5,
+        "sampler_name": "euler_ancestral",
+        "scheduler": "normal",
+        "denoise": 1,
+        "model": [
+          "2",
+          0
+        ],
+        "positive": [
+          "4",
+          0
+        ],
+        "negative": [
+          "5",
+          0
+        ],
+        "latent_image": [
+          "6",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "Illustrious • 28 steps • CFG 5.5"
+      }
+    },
+    "8": {
+      "class_type": "VAEDecode",
+      "inputs": {
+        "samples": [
+          "7",
+          0
+        ],
+        "vae": [
+          "2",
+          2
+        ]
+      },
+      "_meta": {
+        "title": "SDXL VAE 解码"
+      }
+    },
+    "9": {
+      "class_type": "SaveImage",
+      "inputs": {
+        "filename_prefix": "Studio/Illustrious_original",
+        "images": [
+          "8",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "保存原图"
+      }
+    },
+    "10": {
+      "class_type": "SeedVR2LoadDiTModel",
+      "inputs": {
+        "model": "seedvr2_ema_3b_fp8_e4m3fn.safetensors",
+        "device": "cuda:0",
+        "blocks_to_swap": 16,
+        "swap_io_components": true,
+        "offload_device": "cpu",
+        "cache_model": false,
+        "attention_mode": "sdpa"
+      },
+      "_meta": {
+        "title": "SeedVR2 / 3B FP8 (16-block offload)"
+      }
+    },
+    "11": {
+      "class_type": "SeedVR2LoadVAEModel",
+      "inputs": {
+        "model": "ema_vae_fp16.safetensors",
+        "device": "cuda:0",
+        "encode_tiled": true,
+        "encode_tile_size": 1024,
+        "encode_tile_overlap": 128,
+        "decode_tiled": true,
+        "decode_tile_size": 1024,
+        "decode_tile_overlap": 128,
+        "tile_debug": "false",
+        "offload_device": "none",
+        "cache_model": false
+      },
+      "_meta": {
+        "title": "SeedVR2 / VAE (tiled)"
+      }
+    },
+    "12": {
+      "class_type": "SeedVR2VideoUpscaler",
+      "inputs": {
+        "seed": 42,
+        "resolution": 1280,
+        "max_resolution": 0,
+        "batch_size": 1,
+        "uniform_batch_size": false,
+        "color_correction": "lab",
+        "temporal_overlap": 0,
+        "prepend_frames": 0,
+        "input_noise_scale": 0,
+        "latent_noise_scale": 0,
+        "offload_device": "cpu",
+        "enable_debug": false,
+        "image": [
+          "8",
+          0
+        ],
+        "dit": [
+          "10",
+          0
+        ],
+        "vae": [
+          "11",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "SeedVR2 / Image restore to short side 1280"
+      }
+    },
+    "13": {
+      "class_type": "SaveImage",
+      "inputs": {
+        "filename_prefix": "Studio/SeedVR2_restored",
+        "images": [
+          "12",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "保存修复图"
+      }
+    }
+  },
+  "builtin": false,
+  "version": 1
+}

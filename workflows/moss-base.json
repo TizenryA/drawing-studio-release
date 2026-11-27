@@ -1,0 +1,338 @@
+{
+  "id": "moss-base",
+  "name": "MOSS Image Base (BF16)",
+  "mode": "api",
+  "workflow": {
+    "1": {
+      "class_type": "UNETLoader",
+      "inputs": {
+        "unet_name": "moss_image_base_bf16.safetensors",
+        "weight_dtype": "default"
+      },
+      "_meta": {
+        "title": "MOSS Base UNET (bf16)"
+      }
+    },
+    "2": {
+      "class_type": "ModelSamplingAuraFlow",
+      "inputs": {
+        "shift": 5.0,
+        "sampling": "flow",
+        "model": [
+          "1",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "MOSS Base 流调度 (Shift 5.0)"
+      }
+    },
+    "4": {
+      "class_type": "CLIPLoader",
+      "inputs": {
+        "clip_name": "qwen3.5_9b_int8_convrot.safetensors",
+        "type": "moss_image",
+        "device": "default"
+      },
+      "_meta": {
+        "title": "MOSS Qwen 3.5 9B CLIP"
+      }
+    },
+    "5": {
+      "class_type": "VAELoader",
+      "inputs": {
+        "vae_name": "flux2-vae.safetensors"
+      },
+      "_meta": {
+        "title": "Flux2 / MOSS VAE"
+      }
+    },
+    "6": {
+      "class_type": "CLIPTextEncode",
+      "inputs": {
+        "text": "1girl, ink-and-gouache anime editorial illustration, lantern courtyard at dusk, dramatic rim lighting, masterpiece",
+        "clip": [
+          "4",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "正向提示词"
+      }
+    },
+    "7": {
+      "class_type": "CLIPTextEncode",
+      "inputs": {
+        "text": "lowres, blurry, bad anatomy, extra limbs, extra fingers, fused fingers, mutated hands, twisted wrists, floating limbs, text, watermark",
+        "clip": [
+          "4",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "反向提示词"
+      }
+    },
+    "8": {
+      "class_type": "EmptyFlux2LatentImage",
+      "inputs": {
+        "width": 896,
+        "height": 1344,
+        "batch_size": 1
+      },
+      "_meta": {
+        "title": "MOSS Base 空 Latent (896×1344)"
+      }
+    },
+    "9": {
+      "class_type": "KSampler",
+      "inputs": {
+        "seed": 999,
+        "steps": 36,
+        "cfg": 3.2,
+        "sampler_name": "euler",
+        "scheduler": "sgm_uniform",
+        "denoise": 1.0,
+        "model": [
+          "2",
+          0
+        ],
+        "positive": [
+          "6",
+          0
+        ],
+        "negative": [
+          "7",
+          0
+        ],
+        "latent_image": [
+          "8",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "KSampler (MOSS Base · Euler / SGM Uniform)"
+      }
+    },
+    "10": {
+      "class_type": "VAEDecode",
+      "inputs": {
+        "samples": [
+          "9",
+          0
+        ],
+        "vae": [
+          "5",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "VAE 解码"
+      }
+    },
+    "11": {
+      "class_type": "SaveImage",
+      "inputs": {
+        "filename_prefix": "MOSS_Base",
+        "images": [
+          "10",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "保存图像"
+      }
+    }
+  },
+  "mapping": {
+    "prompt": {
+      "node": "6",
+      "input": "text"
+    },
+    "negative_prompt": {
+      "node": "7",
+      "input": "text"
+    },
+    "seed": {
+      "node": "9",
+      "input": "seed"
+    },
+    "steps": {
+      "node": "9",
+      "input": "steps"
+    },
+    "cfg": {
+      "node": "9",
+      "input": "cfg"
+    },
+    "sampler": {
+      "node": "9",
+      "input": "sampler_name"
+    },
+    "scheduler": {
+      "node": "9",
+      "input": "scheduler"
+    },
+    "width": {
+      "node": "8",
+      "input": "width"
+    },
+    "height": {
+      "node": "8",
+      "input": "height"
+    },
+    "batch_size": {
+      "node": "8",
+      "input": "batch_size"
+    },
+    "shift": {
+      "node": "2",
+      "input": "shift"
+    }
+  },
+  "import_notes": "MOSS Image Base (BF16) 通用配置：默认 Shift 5.0（推荐 4.5~5.5）、Steps 36（推荐 32~45）、CFG 3.2（推荐 3.0~3.5）、euler / sgm_uniform、896×1344（建议 1M~1.6M 像素出图后再接 SeedVR2 精修）。色彩笔触厚重，适合单场景插画；可在面板自由叠加公开 LoRA，复杂多格分镜与高难度肢体动作请切至 MOSS Image SFT (INT8)（moss-sft）。",
+  "source_workflow": {
+    "1": {
+      "class_type": "UNETLoader",
+      "inputs": {
+        "unet_name": "moss_image_base_bf16.safetensors",
+        "weight_dtype": "default"
+      },
+      "_meta": {
+        "title": "MOSS Base UNET (bf16)"
+      }
+    },
+    "2": {
+      "class_type": "ModelSamplingAuraFlow",
+      "inputs": {
+        "shift": 5.0,
+        "sampling": "flow",
+        "model": [
+          "1",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "MOSS Base 流调度 (Shift 5.0)"
+      }
+    },
+    "4": {
+      "class_type": "CLIPLoader",
+      "inputs": {
+        "clip_name": "qwen3.5_9b_int8_convrot.safetensors",
+        "type": "moss_image",
+        "device": "default"
+      },
+      "_meta": {
+        "title": "MOSS Qwen 3.5 9B CLIP"
+      }
+    },
+    "5": {
+      "class_type": "VAELoader",
+      "inputs": {
+        "vae_name": "flux2-vae.safetensors"
+      },
+      "_meta": {
+        "title": "Flux2 / MOSS VAE"
+      }
+    },
+    "6": {
+      "class_type": "CLIPTextEncode",
+      "inputs": {
+        "text": "1girl, ink-and-gouache anime editorial illustration, lantern courtyard at dusk, dramatic rim lighting, masterpiece",
+        "clip": [
+          "4",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "正向提示词"
+      }
+    },
+    "7": {
+      "class_type": "CLIPTextEncode",
+      "inputs": {
+        "text": "lowres, blurry, bad anatomy, extra limbs, extra fingers, fused fingers, mutated hands, twisted wrists, floating limbs, text, watermark",
+        "clip": [
+          "4",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "反向提示词"
+      }
+    },
+    "8": {
+      "class_type": "EmptyFlux2LatentImage",
+      "inputs": {
+        "width": 896,
+        "height": 1344,
+        "batch_size": 1
+      },
+      "_meta": {
+        "title": "MOSS Base 空 Latent (896×1344)"
+      }
+    },
+    "9": {
+      "class_type": "KSampler",
+      "inputs": {
+        "seed": 999,
+        "steps": 36,
+        "cfg": 3.2,
+        "sampler_name": "euler",
+        "scheduler": "sgm_uniform",
+        "denoise": 1.0,
+        "model": [
+          "2",
+          0
+        ],
+        "positive": [
+          "6",
+          0
+        ],
+        "negative": [
+          "7",
+          0
+        ],
+        "latent_image": [
+          "8",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "KSampler (MOSS Base · Euler / SGM Uniform)"
+      }
+    },
+    "10": {
+      "class_type": "VAEDecode",
+      "inputs": {
+        "samples": [
+          "9",
+          0
+        ],
+        "vae": [
+          "5",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "VAE 解码"
+      }
+    },
+    "11": {
+      "class_type": "SaveImage",
+      "inputs": {
+        "filename_prefix": "MOSS_Base",
+        "images": [
+          "10",
+          0
+        ]
+      },
+      "_meta": {
+        "title": "保存图像"
+      }
+    }
+  },
+  "builtin": false,
+  "version": 1
+}

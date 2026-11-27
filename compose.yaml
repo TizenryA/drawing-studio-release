@@ -1,0 +1,15 @@
+services:
+  drawing-studio:
+    build: .
+    image: drawing-studio:1.0.42
+    container_name: drawing-studio
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8790:8790"
+    volumes:
+      - ./data:/data
+      - ./config:/config
+    environment:
+      DRAWING_DATA: /data
+      DRAWING_COLAB_CREDENTIALS: /config/private/colab.json
+      DRAWING_DRIVE_CREDENTIALS: /config/private/drive.json
