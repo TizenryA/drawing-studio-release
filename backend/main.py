@@ -4,6 +4,7 @@ import base64
 import html
 import io
 import json
+import logging
 import mimetypes
 import os
 import secrets
@@ -39,6 +40,18 @@ auth = Auth(db)
 listeners = set()
 runtime = drive = comfy = workflows = tasks = gallery = oauth_flows = None
 background = set()
+log = logging.getLogger(__name__)
+last_sync_activity = 0.0
+
+
+def _touch_runtime_activity(at=None, *, sync=False):
+    global last_sync_activity
+    ts = float(at if at is not None else time.time())
+    if sync:
+        last_sync_activity = ts if at is not None else max(last_sync_activity, ts)
+    if runtime is not None and hasattr(runtime, 'touch_activity'):
+        return runtime.touch_activity(at)
+    return ts
 
 
 def _oauth_manager():
@@ -403,7 +416,7 @@ async def start_runtime(request: Request):
 
 @app.post('/api/runtime/stop')
 async def stop_runtime():
-    res = await runtime.stop()
+    res = await runtime.stop(reason='手动关机', trigger='manual')
     _invalidate_task_caches()
     return res
 
@@ -429,19 +442,90 @@ async def restart_comfy():
     return res
 
 
+def _has_active_gpu_work():
+    has_active = db.active_task_count() > 0 if hasattr(db, 'active_task_count') else any(t['status'] in {'queued', 'running'} for t in db.list('tasks'))
+    return has_active or any(lock.locked() for lock in sync_locks.values()) or any(not t.done() for t in sync_tasks.values())
+
+
+def _effective_runtime_mode(state, config):
+    mode = (state or {}).get('mode') or (config or {}).get('mode') or 'temporary'
+    return str(mode).strip().lower()
+
+
+def _compute_idle_anchor(state, *, now=None):
+    cur = float(now if now is not None else time.time())
+    ready_at = (state or {}).get('ready_at')
+    floor = float(ready_at) if ready_at is not None else float((state or {}).get('last_activity') or (state or {}).get('started_at') or cur)
+    candidates = [floor]
+    for raw in (
+        (state or {}).get('last_activity'),
+        getattr(runtime, 'last_activity', None),
+        getattr(tasks, 'last_activity', None),
+        last_sync_activity,
+    ):
+        if raw is None:
+            continue
+        val = float(raw)
+        if floor <= val <= cur + 5.0:
+            candidates.append(val)
+    return max(candidates)
+
+
+async def idle_watchdog_tick(*, now=None):
+    if runtime is None:
+        return False
+    state = await runtime.status()
+    config = settings()
+    if state.get('state') != 'ready' or _effective_runtime_mode(state, config) == 'persistent':
+        return False
+    if _has_active_gpu_work():
+        return False
+    try:
+        idle_minutes = float(config.get('idle_minutes', 60))
+    except (TypeError, ValueError):
+        idle_minutes = 60.0
+    threshold_s = max(1.0, idle_minutes) * 60.0
+    cur = float(now if now is not None else time.time())
+    last = _compute_idle_anchor(state, now=cur)
+    idle_s = cur - last
+    if idle_s <= threshold_s:
+        return False
+    # Re-check live queue, syncs, mode, and runtime activity right before stopping to prevent race shutdowns.
+    latest_handle = runtime.handle if isinstance(getattr(runtime, 'handle', None), dict) else {}
+    latest_state = {**state, **latest_handle}
+    if 'last_activity' in state and state.get('last_activity') is not None:
+        h_act = latest_handle.get('last_activity')
+        s_act = float(state['last_activity'])
+        latest_state['last_activity'] = max(s_act, float(h_act)) if h_act is not None else s_act
+    latest_config = settings()
+    if latest_state.get('state') != 'ready' or _effective_runtime_mode(latest_state, latest_config) == 'persistent':
+        return False
+    if _has_active_gpu_work():
+        return False
+    if now is None:
+        cur = time.time()
+    latest_last = _compute_idle_anchor(latest_state, now=cur)
+    idle_s = cur - latest_last
+    if idle_s <= threshold_s:
+        return False
+    idle_min = idle_s / 60.0
+    reason = f'空闲超时自动关机（已空闲 {idle_min:.1f} 分钟 > 阈值 {idle_minutes:g} 分钟）'
+    log.info('Idle watchdog stopping runtime: %s (mode=%s, ready_at=%s, anchor=%s)',
+             reason, _effective_runtime_mode(latest_state, latest_config), latest_state.get('ready_at'), latest_last)
+    await runtime.stop(reason=reason, trigger='idle_watchdog', require_ready=True)
+    _invalidate_task_caches()
+    return True
+
+
 async def idle_watchdog():
     while True:
-        await asyncio.sleep(30)
-        state = await runtime.status()
-        config = settings()
-        if state.get('state') != 'ready' or config.get('mode', 'temporary') == 'persistent':
-            continue
-        has_active = db.active_task_count() > 0 if hasattr(db, 'active_task_count') else any(t['status'] in {'queued', 'running'} for t in db.list('tasks'))
-        if has_active or any(lock.locked() for lock in sync_locks.values()) or any(not t.done() for t in sync_tasks.values()):
-            continue
-        last = getattr(tasks, 'last_activity', time.time())
-        if time.time() - last > float(config.get('idle_minutes', 60)) * 60:
-            await runtime.stop()
+        try:
+            await asyncio.sleep(30)
+            await idle_watchdog_tick()
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            log.exception('Idle watchdog tick failed')
 
 
 @app.get('/api/models')
@@ -532,6 +616,7 @@ async def sync_model(model_or_id, on_progress=None, *, use_semaphore=False):
             await asyncio.sleep(1)
         async with lock:
             async def report(progress):
+                _touch_runtime_activity(sync=True)
                 saved = db.save('models', {'id': model_id, **progress})
                 emit('models', saved)
                 if on_progress:
@@ -540,11 +625,13 @@ async def sync_model(model_or_id, on_progress=None, *, use_semaphore=False):
                         await value
 
             try:
+                _touch_runtime_activity(sync=True)
                 await report({'status': 'downloading', 'stage': 'preparing', 'error': None,
                               'filename': row.get('filename') or row.get('name'),
                               'downloaded_bytes': 0, 'total_bytes': int(row.get('size') or 0),
                               'download_progress': None})
                 result = await comfy.sync_model(row, drive, on_progress=report)
+                _touch_runtime_activity(sync=True)
                 await report({'status': 'ready', 'stage': 'ready',
                               'gpu_path': result.get('path', row.get('path')), 'error': None})
                 _invalidate_task_caches()
@@ -590,6 +677,7 @@ def _start_background_sync(model_id):
             if sync_tasks.get(model_id) is asyncio.current_task():
                 sync_tasks.pop(model_id, None)
 
+    _touch_runtime_activity(sync=True)
     sync_tasks[model_id] = asyncio.create_task(runner(), name=f'model-sync-{model_id[:8]}')
     return saved
 
@@ -1192,7 +1280,10 @@ async def openai_edit(request: Request):
 
 @app.api_route('/comfy/{path:path}', methods=['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'])
 async def comfy_proxy(path: str, request: Request):
-    return await comfy.proxy(path, request)
+    _touch_runtime_activity()
+    res = await comfy.proxy(path, request)
+    _touch_runtime_activity()
+    return res
 
 
 @app.websocket('/comfy/ws')
@@ -1202,6 +1293,7 @@ async def comfy_websocket(websocket: WebSocket):
     except HTTPException:
         await websocket.close(code=4401)
         return
+    _touch_runtime_activity()
     await comfy.websocket_proxy(websocket)
 
 

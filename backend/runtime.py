@@ -101,7 +101,7 @@ class Runtime:
             raise AdapterError('runtime.json损坏；请保留原文件并人工核对Colab实例，禁止自动新申请') from None
         self.lifecycle_lock = asyncio.Lock()
         self.kernel_lock = asyncio.Lock()
-        self.last_activity = time.time()
+        self.last_activity = float(self.handle.get('last_activity') or self.handle.get('ready_at') or time.time())
         self._status_checked = 0.0
         self._health_checked = 0.0
         self._health_failures = 0
@@ -117,6 +117,13 @@ class Runtime:
         self.handle.update(patch)
         private_json(self.path, self.handle)
 
+    def touch_activity(self, at=None, *, persist=False):
+        ts = time.time() if at is None else float(at)
+        self.last_activity = ts if at is not None else max(self.last_activity, ts)
+        if persist and self.handle.get('state') not in {None, 'off'}:
+            self._save(last_activity=self.last_activity)
+        return self.last_activity
+
     async def _event(self, state=None, message=None):
         if state:
             self._save(state=state)
@@ -129,7 +136,8 @@ class Runtime:
 
     def _public(self):
         h = self.handle
-        return {**{k: h.get(k) for k in ('state', 'gpu', 'mode', 'endpoint', 'started_at', 'disconnected_at', 'error', 'actual_gpu', 'memory_used', 'memory_total', 'message')},
+        return {**{k: h.get(k) for k in ('state', 'gpu', 'mode', 'endpoint', 'started_at', 'ready_at', 'stopped_at', 'stop_reason', 'stop_trigger', 'disconnected_at', 'error', 'actual_gpu', 'memory_used', 'memory_total', 'message')},
+                'last_activity': h.get('last_activity') if h.get('last_activity') is not None else self.last_activity,
                 'runtime_id': h.get('endpoint'), 'instance_id': h.get('endpoint'), 'worker_ports': h.get('worker_ports') or [8188], 'logs': h.get('logs', [])}
 
     def _mark_disconnected(self, reason):
@@ -230,10 +238,14 @@ class Runtime:
                 'allocating', 'bootstrapping', 'syncing', 'starting', 'starting_comfy',
                 'ready', 'stopping', 'allocation_unknown'}:
             raise AdapterError('机器正在运行、启动或待协调，禁止重复申请')
+        now = time.time()
         self.handle = {'state': 'allocating', 'gpu': str(gpu).upper(), 'mode': mode,
-                       'started_at': time.time(), 'error': None,
+                       'started_at': now, 'ready_at': None, 'stopped_at': None,
+                       'stop_reason': None, 'stop_trigger': None, 'last_activity': now,
+                       'error': None,
                        'message': '正在核对GPU可用性',
-                       'logs': [{'time': time.time(), 'state': 'allocating', 'message': '正在核对GPU可用性'}]}
+                       'logs': [{'time': now, 'state': 'allocating', 'message': '正在核对GPU可用性'}]}
+        self.last_activity = now
         self._save()
         return self._public()
 
@@ -286,6 +298,9 @@ class Runtime:
                 except Exception:
                     pass
                 self._health_failures = 0
+                ready_ts = time.time()
+                self.last_activity = ready_ts
+                self._save(ready_at=ready_ts, last_activity=ready_ts, stopped_at=None, stop_reason=None, stop_trigger=None)
                 await self._event('ready', 'ComfyUI已就绪')
                 return self._public()
             except BaseException as exc:
@@ -315,19 +330,31 @@ class Runtime:
                                 await self._tun('POST', path, headers={'X-Goog-Colab-Token': c['token']})
                         except Exception:
                             pass
-            self.handle = {'state': 'off', 'stopped_at': time.time()}
+            prev_logs = list(self.handle.get('logs') or [])[-180:]
+            self.handle = {
+                'state': 'off',
+                'stopped_at': time.time(),
+                'stop_reason': '手动复位状态并清理残留实例',
+                'stop_trigger': 'manual_reset',
+                'logs': prev_logs,
+            }
             self._health_failures = 0
             self._kernel_verified_id = None
             self._kernel_verified_at = 0.0
             await self._event('off', '已完成状态复位与残留清理')
             return self._public()
 
-    async def stop(self):
+    async def stop(self, *, reason=None, trigger='manual', require_ready=False):
+        if require_ready and self.handle.get('state') != 'ready':
+            return self._public()
         starting = self._starting_task
         if starting and starting is not asyncio.current_task() and not starting.done():
             starting.cancel()
             await asyncio.gather(starting, return_exceptions=True)
         async with self.lifecycle_lock:
+            if require_ready and self.handle.get('state') != 'ready':
+                return self._public()
+            reason_text = reason or ('空闲超时自动关机' if trigger == 'idle_watchdog' else '手动关机')
             endpoint = self.handle.get('endpoint')
             if not endpoint:
                 if self.handle.get('state') == 'allocation_unknown':
@@ -337,12 +364,32 @@ class Runtime:
                     except Exception:
                         rows = []
                     if not rows:
+                        prev_logs = list(self.handle.get('logs') or [])[-180:]
+                        self.handle = {
+                            'state': 'off',
+                            'stopped_at': time.time(),
+                            'stop_reason': reason_text,
+                            'stop_trigger': trigger,
+                            'logs': prev_logs,
+                        }
                         await self._event('off', '已确认无活跃实例，状态已复位')
                         return self._public()
                     raise AdapterError('分配结果未知，先recover_allocation再关闭')
-                await self._event('off')
+                if self.handle.get('state') != 'off':
+                    prev_logs = list(self.handle.get('logs') or [])[-180:]
+                    self.handle = {
+                        'state': 'off',
+                        'stopped_at': time.time(),
+                        'stop_reason': reason_text,
+                        'stop_trigger': trigger,
+                        'logs': prev_logs,
+                    }
+                    await self._event('off', f'已停止运行时（{reason_text}）')
+                else:
+                    await self._event('off')
                 return self._public()
-            await self._event('stopping')
+            log.info('Stopping runtime %s (trigger=%s, reason=%s)', endpoint, trigger, reason_text)
+            await self._event('stopping', f'正在关闭Colab运行时（{reason_text}）')
             rows = await self._assignments()
             if any(a.get('endpoint') == endpoint for a in rows):
                 path = '/tun/m/unassign/' + quote(endpoint, safe='')
@@ -352,11 +399,18 @@ class Runtime:
                 await self._tun('POST', path, headers={'X-Goog-Colab-Token': confirmation['token']})
                 if any(a.get('endpoint') == endpoint for a in await self._assignments()):
                     raise AdapterError('Colab尚未确认释放，保留句柄，请重试关闭')
-            self.handle = {'state': 'off', 'stopped_at': time.time()}
+            prev_logs = list(self.handle.get('logs') or [])[-180:]
+            self.handle = {
+                'state': 'off',
+                'stopped_at': time.time(),
+                'stop_reason': reason_text,
+                'stop_trigger': trigger,
+                'logs': prev_logs,
+            }
             self._health_failures = 0
             self._kernel_verified_id = None
             self._kernel_verified_at = 0.0
-            await self._event('off', 'Colab运行时已确认释放')
+            await self._event('off', f'Colab运行时已确认释放（{reason_text}）')
             try:
                 await asyncio.wait_for(self.quota(force=True), timeout=8)
             except Exception:
@@ -391,6 +445,11 @@ class Runtime:
                                     'message': 'ComfyUI已就绪' if health.get('ok') else 'ComfyUI不可用，可重启进程',
                                     'disconnected_at': None,
                                 }
+                                if health.get('ok') and (self.handle.get('state') != 'ready' or not self.handle.get('ready_at')):
+                                    recovered_at = float(self.handle.get('ready_at') or self.touch_activity(persist=False))
+                                    patch['ready_at'] = recovered_at
+                                    patch['last_activity'] = max(float(self.handle.get('last_activity') or 0.0), recovered_at)
+                                    self.last_activity = patch['last_activity']
                                 try:
                                     used, total = health['memory'].splitlines()[0].split(',')
                                     patch.update(memory_used=int(used.strip()) * 1024**2, memory_total=int(total.strip()) * 1024**2)
@@ -413,6 +472,10 @@ class Runtime:
                 await asyncio.wait_for(self.quota(), timeout=8)
             except Exception:
                 pass
+        if self.handle.get('state') == 'ready' and not self.handle.get('ready_at'):
+            backfill = max(float(self.last_activity or 0.0), time.time())
+            self.last_activity = backfill
+            self._save(ready_at=backfill, last_activity=backfill)
         h = self.handle
         result = self._public()
         end_ts = float(h['disconnected_at']) if h.get('state') == 'disconnected' and h.get('disconnected_at') else time.time()
@@ -458,7 +521,7 @@ class Runtime:
     async def execute(self, code, timeout=120, *, activity=True, interrupt_on_timeout=True):
         async with self.kernel_lock:
             if activity:
-                self.last_activity = time.time()
+                self.touch_activity(persist=False)
             url, token = await self._connection()
             params = {'colab-runtime-proxy-token': token, 'authuser': '0'}
             headers = {'X-Colab-Client-Agent': 'colab-cli', 'X-Colab-Runtime-Proxy-Token': token}
@@ -587,5 +650,8 @@ class Runtime:
             if result.get('executionError'):
                 await self._event('error', 'ComfyUI重启失败')
                 raise AdapterError('ComfyUI重启失败')
-            await self._event('ready')
+            ready_ts = time.time()
+            self.last_activity = ready_ts
+            self._save(ready_at=ready_ts, last_activity=ready_ts, stopped_at=None, stop_reason=None, stop_trigger=None)
+            await self._event('ready', 'ComfyUI重启完成并已就绪')
             return await self.status()

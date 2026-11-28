@@ -138,7 +138,7 @@ export default function Machine({ runtime, runtimeError, runtimeAction, settings
                   ? `${Math.floor(runtime.uptime / 3600)} 小时 ${Math.floor((runtime.uptime % 3600) / 60)} 分钟`
                   : '未运行'}
               </strong>
-              <span>{isDisconnected ? '已断开，停止计费' : settings.mode === 'temporary' ? `空闲 ${settings.idle_minutes ?? 60} 分自动关机` : '持久模式'}</span>
+              <span>{isDisconnected ? '已断开，停止计费' : ((active && runtime?.mode ? runtime.mode : settings.mode) || 'temporary') === 'temporary' ? `空闲 ${settings.idle_minutes ?? 60} 分自动关机` : '持久模式'}</span>
             </div>
             <div className="kpi-card">
               <small>任务队列</small>
