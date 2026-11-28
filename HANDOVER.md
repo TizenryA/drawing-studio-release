@@ -1,12 +1,16 @@
-# Drawing Studio (`v1.0.43`) 源码与架构交接文档
+# Drawing Studio (`v1.0.44`) 源码与架构交接文档
 
-本文档面向接手维护、二次开发或独立部署 **Drawing Studio** 的工程师，基于 `v1.0.43` 干净公开版源码编写，所有路由、字段、模块职责、工作流清单与约束条件均与当前源码逐一对应。
+本文档面向接手维护、二次开发或独立部署 **Drawing Studio** 的工程师，基于 `v1.0.44` 干净公开版源码编写，所有路由、字段、模块职责、工作流清单与约束条件均与当前源码逐一对应。
 
 ---
 
 ## 1. 版本基线与演进历史
 
-- **源码基线版本**：`1.0.43`（`backend/main.py` 中的 `FastAPI(..., version='1.0.43')`、`GET /api/health` 返回 `{"ok": true, "version": "1.0.43"}`、`web/package.json` 版本号 `1.0.43`）。
+- **源码基线版本**：`1.0.44`（`backend/main.py` 中的 `FastAPI(..., version='1.0.44')`、`GET /api/health` 返回 `{"ok": true, "version": "1.0.44"}`、`web/package.json` 版本号 `1.0.44`）。
+- **`1.0.43` → `1.0.44` 核心变更**：
+  - 修复 Issue #1 空闲自动关机误触发：在 `backend/runtime.py` 中记录并持久化每次实例的 `ready_at` / `last_activity`（热升级旧 `runtime.json` 时于 `status()` 自动回填），并在 `backend/main.py` 将 `idle_watchdog` 空闲计时严格锚定于 `>= ready_at`，接入模型同步与 `/comfy/` 代理活动，增加异步窗口竞态二次复核与 `require_ready=True` 停机保护。
+  - 修复单次运行的 `persistent` / `temporary` 模式覆盖：`idle_watchdog`（`_effective_runtime_mode`）与前端机器页 `web/src/pages/Machine.jsx` 均优先遵循当前活跃实例的 `runtime.mode`，不再被全局 `settings.mode` 覆盖。
+  - 增强停机可观测性：`Runtime.stop()` 与 `Runtime.reset()` 保留最近 180 条历史 `logs`，并持久化 `stop_trigger`、`stop_reason` 与 `stopped_at`，写入完整关机原因与阈值日志；新增 `backend/test_idle_watchdog.py` 10 项回归测试。
 - **`1.0.42` → `1.0.43` 核心变更**：
   - 采用 **GNU AGPL-3.0** 开源协议，并在 [Dockerfile](./Dockerfile) 与 [Dockerfile.release](./Dockerfile.release) 镜像构建阶段嵌入 [LICENSE](./LICENSE)。
   - 新增完整的 **Google Colab & Google Drive 独立 OAuth2 授权后端（[backend/oauth_flow.py](./backend/oauth_flow.py)）与前端向导面板（[web/src/components/OAuthPanel.jsx](./web/src/components/OAuthPanel.jsx)）**，支持 PKCE 手动复制授权码、同源 HTTPS 弹窗回调、凭据 JSON 验证导入、实时连通性测试与一键解绑。
@@ -221,7 +225,7 @@ STUDIO_DIR=/opt/drawing-studio bash ops/backup.sh
    - 先运行 `ops/backup.sh` 完成在线备份。
    - 执行 `docker compose build && docker compose up -d`。
 3. **上线后验收**：
-   - 验证 `GET /api/health` 返回 `{"ok": true, "version": "1.0.43"}`。
+   - 验证 `GET /api/health` 返回 `{"ok": true, "version": "1.0.44"}`。
    - 验证登录态、`/api/runtime` 状态接管、`GET /api/gallery?page=1&limit=12` 列表及视频播放（206 Range）。
 4. **回滚方法**：
    - 若需回滚，先在无活跃任务时停止容器，切回旧镜像版本并恢复升级前备份的 `data/` 与 `compose.yaml`，再启动容器。

@@ -1,7 +1,7 @@
 services:
   drawing-studio:
     build: .
-    image: drawing-studio:1.0.43
+    image: drawing-studio:1.0.44
     container_name: drawing-studio
     restart: unless-stopped
     ports:

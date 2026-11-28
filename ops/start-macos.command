@@ -50,7 +50,7 @@ if [ ! -d "$PROJECT_DIR/web/dist" ] && [ ! -f "$PROJECT_DIR/web/dist/index.html"
 fi
 
 VENV_DIR="$PROJECT_DIR/.venv"
-DEPS_STAMP="$VENV_DIR/.deps-1.0.43"
+DEPS_STAMP="$VENV_DIR/.deps-1.0.44"
 
 if [ ! -d "$VENV_DIR" ]; then
   echo "[Setup] Creating Python virtual environment with $PYTHON_BIN ..."
@@ -76,7 +76,7 @@ export DRAWING_DRIVE_CREDENTIALS="$PROJECT_DIR/config/private/drive.json"
 export PYTHONUNBUFFERED=1
 
 echo "============================================================"
-echo "  Drawing Studio v1.0.43 (macOS Native Launcher)"
+echo "  Drawing Studio v1.0.44 (macOS Native Launcher)"
 echo "  Architecture : $(uname -m)"
 echo "  Listen URL   : http://${HOST}:${PORT}"
 echo "  Data Dir     : $DRAWING_DATA"
